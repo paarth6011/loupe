@@ -8,13 +8,13 @@ React dashboard. Everything runs locally via Docker Compose.
 
 ```bash
 cp .env.example .env        # optional — sensible defaults are baked in
-docker compose up --build   # brings up db + backend + frontend + simulator
+docker compose up --build   # brings up db + backend + frontend + prober
 ```
 
 Then open **http://localhost:5173** and sign in with **admin / admin**.
 
-The simulator immediately starts posting traffic for three workloads, so the charts
-and alerts populate within seconds.
+The prober immediately starts measuring real HTTP endpoints (latency + up/down),
+so the charts and alerts populate within seconds.
 
 ## Services & ports
 
@@ -23,7 +23,7 @@ and alerts populate within seconds.
 | frontend    | http://localhost:5173   | React + TypeScript dashboard (nginx)       |
 | backend     | http://localhost:8000   | FastAPI API (`/docs` for Swagger UI)       |
 | db          | localhost:5432          | PostgreSQL 16                              |
-| simulator   | —                       | Generates synthetic workload metrics       |
+| prober      | —                       | Probes real HTTP endpoints (latency + up/down) |
 
 The backend runs `alembic upgrade head` on startup, so the schema is created
 automatically on first boot.
