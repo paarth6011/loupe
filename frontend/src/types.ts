@@ -9,6 +9,8 @@ export interface Alert {
   workload_id: number;
   rule: string;
   message: string;
+  severity: string;
+  summary: string | null;
   triggered_at: string;
   resolved_at: string | null;
 }

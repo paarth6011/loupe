@@ -26,12 +26,16 @@ export default function AlertsPanel({
               className={`alert ${a.resolved_at ? "alert-resolved" : "alert-open"}`}
             >
               <div className="alert-head">
-                <span className="alert-rule">{a.rule}</span>
+                <span className="alert-rule">
+                  <span className={`sev sev-${a.severity}`}>{a.severity}</span>
+                  {a.rule}
+                </span>
                 <span className="alert-time">
                   {new Date(a.triggered_at).toLocaleTimeString()}
                 </span>
               </div>
               <div className="alert-msg">{a.message}</div>
+              {a.summary ? <div className="alert-summary">{a.summary}</div> : null}
               <div className="alert-meta">{nameOf(a.workload_id)}</div>
             </li>
           ))}
