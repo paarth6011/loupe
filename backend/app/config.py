@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     summary_cache_ttl_seconds: int = 15
 
+    # LLM incident summaries (Phase 2). Empty key -> template fallback.
+    anthropic_api_key: str = ""
+    summary_model: str = "claude-haiku-4-5"
+
 
 @lru_cache
 def get_settings() -> Settings:

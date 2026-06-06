@@ -1,15 +1,15 @@
 from datetime import datetime, timedelta, timezone
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.aggregation import as_utc, parse_window, percentile
 from app.alerting import evaluate_thresholds
 from app.cache import Cache, get_cache
 from app.config import Settings, get_settings
-from app.database import get_db
+from app.database import get_db, get_session_factory
 from app.deps import get_current_user
 from app.models import MetricSample, Workload
 from app.schemas.auth import CurrentUser
@@ -19,6 +19,12 @@ from app.schemas.metrics import (
     MetricsSummary,
     MetricsTimeseries,
     TimeseriesPoint,
+)
+from app.summarizer import (
+    AlertContext,
+    Summarizer,
+    generate_and_store_summary,
+    get_summarizer,
 )
 
 MAX_BUCKETS = 500
@@ -41,8 +47,11 @@ def _get_or_create_workload(db: Session, name: str) -> Workload:
 )
 def ingest_metric(
     body: MetricIngest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    summarizer: Summarizer = Depends(get_summarizer),
+    session_factory: sessionmaker = Depends(get_session_factory),
     _: CurrentUser = Depends(get_current_user),
 ) -> MetricIngestResponse:
     workload = _get_or_create_workload(db, body.workload)
@@ -59,9 +68,43 @@ def ingest_metric(
     db.flush()  # assign id + server-default ts and make it visible to threshold queries
 
     opened, resolved = evaluate_thresholds(db, sample, settings)
+    # Capture what the summary tasks need before commit expires the ORM objects.
+    opened_info = [(a.id, a.rule, a.severity, a.message) for a in opened]
+    workload_name = workload.name
+    workload_id = workload.id
 
     db.commit()
     db.refresh(sample)
+
+    # Generate LLM summaries off the request path; ingestion never blocks on it.
+    if opened_info:
+        recent = db.scalars(
+            select(MetricSample)
+            .where(MetricSample.workload_id == workload_id)
+            .order_by(MetricSample.ts.desc(), MetricSample.id.desc())
+            .limit(settings.error_rate_window)
+        ).all()
+        count = len(recent)
+        errors = sum(1 for s in recent if s.status == "error")
+        latencies = [s.latency_ms for s in recent]
+        for alert_id, rule, severity, message in opened_info:
+            ctx = AlertContext(
+                workload_name=workload_name,
+                rule=rule,
+                severity=severity,
+                message=message,
+                sample_count=count,
+                error_rate=round(errors / count, 4) if count else 0.0,
+                p95_ms=percentile(latencies, 95),
+            )
+            background_tasks.add_task(
+                generate_and_store_summary,
+                alert_id,
+                ctx,
+                summarizer,
+                session_factory,
+            )
+
     return MetricIngestResponse(
         sample=sample, triggered_alerts=opened, resolved_alerts=resolved
     )

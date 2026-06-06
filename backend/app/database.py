@@ -21,3 +21,9 @@ def get_db() -> Iterator[Session]:
         yield db
     finally:
         db.close()
+
+
+def get_session_factory() -> sessionmaker:
+    """Dependency returning the session factory itself, for use in background
+    tasks that run after the request's session is gone."""
+    return SessionLocal

@@ -19,7 +19,8 @@ def test_list_alerts_after_high_latency(client, auth_headers):
     assert len(body) == 1
     assert body[0]["rule"] == "high_latency"
     assert body[0]["resolved_at"] is None
-    assert body[0]["summary"] is None  # filled in later by the LLM
+    # The summary is filled in asynchronously (fake summarizer in tests).
+    assert body[0]["summary"] is not None
 
 
 def test_high_latency_severity_scales_with_magnitude(client, auth_headers):
