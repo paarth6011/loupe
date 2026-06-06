@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -15,7 +16,11 @@ from app.schemas.metrics import (
     MetricIngest,
     MetricIngestResponse,
     MetricsSummary,
+    MetricsTimeseries,
+    TimeseriesPoint,
 )
+
+MAX_BUCKETS = 500
 
 router = APIRouter(tags=["metrics"])
 
@@ -97,4 +102,72 @@ def metrics_summary(
         error_rate=round(errors / count, 4) if count else 0.0,
         latency_p50_ms=percentile(latencies, 50),
         latency_p95_ms=percentile(latencies, 95),
+    )
+
+
+@router.get("/metrics/timeseries", response_model=MetricsTimeseries)
+def metrics_timeseries(
+    workload_id: int,
+    window: str = "1h",
+    bucket: str = "5m",
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+) -> MetricsTimeseries:
+    try:
+        window_delta = parse_window(window)
+        bucket_delta = parse_window(bucket)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    if bucket_delta > window_delta:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="bucket must be <= window",
+        )
+
+    n_buckets = ceil(window_delta / bucket_delta)
+    if n_buckets > MAX_BUCKETS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"too many buckets ({n_buckets}); widen the bucket size",
+        )
+
+    if db.get(Workload, workload_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="workload not found"
+        )
+
+    now = datetime.now(timezone.utc)
+    start = now - window_delta
+    samples = db.scalars(
+        select(MetricSample).where(MetricSample.workload_id == workload_id)
+    ).all()
+
+    grouped: list[list[MetricSample]] = [[] for _ in range(n_buckets)]
+    for s in samples:
+        ts = as_utc(s.ts)
+        if ts < start or ts > now:
+            continue
+        idx = int((ts - start) / bucket_delta)
+        idx = min(idx, n_buckets - 1)  # clamp the right edge
+        grouped[idx].append(s)
+
+    points: list[TimeseriesPoint] = []
+    for i, group in enumerate(grouped):
+        count = len(group)
+        errors = sum(1 for s in group if s.status == "error")
+        latencies = [s.latency_ms for s in group]
+        points.append(
+            TimeseriesPoint(
+                bucket_start=start + bucket_delta * i,
+                request_count=count,
+                error_rate=round(errors / count, 4) if count else 0.0,
+                latency_p50_ms=percentile(latencies, 50),
+                latency_p95_ms=percentile(latencies, 95),
+            )
+        )
+
+    return MetricsTimeseries(
+        workload_id=workload_id, window=window, bucket=bucket, points=points
     )

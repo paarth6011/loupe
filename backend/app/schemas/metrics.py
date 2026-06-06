@@ -38,3 +38,18 @@ class MetricsSummary(BaseModel):
     error_rate: float
     latency_p50_ms: float | None
     latency_p95_ms: float | None
+
+
+class TimeseriesPoint(BaseModel):
+    bucket_start: datetime
+    request_count: int
+    error_rate: float
+    latency_p50_ms: float | None
+    latency_p95_ms: float | None
+
+
+class MetricsTimeseries(BaseModel):
+    workload_id: int
+    window: str
+    bucket: str
+    points: list[TimeseriesPoint]
