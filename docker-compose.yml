@@ -15,6 +15,16 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./backend
     # Dev: migrate, then serve with autoreload. (Image default is sh start.sh.)
@@ -23,6 +33,7 @@ services:
       - ./backend:/app
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://cloudops:cloudops@db:5432/cloudops}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
@@ -32,6 +43,8 @@ services:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.aggregation import as_utc, parse_window, percentile
 from app.alerting import evaluate_thresholds
+from app.cache import Cache, get_cache
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.deps import get_current_user
@@ -71,6 +72,8 @@ def metrics_summary(
     workload_id: int,
     window: str = "1h",
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
+    settings: Settings = Depends(get_settings),
     _: CurrentUser = Depends(get_current_user),
 ) -> MetricsSummary:
     try:
@@ -79,6 +82,11 @@ def metrics_summary(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         )
+
+    cache_key = f"summary:{workload_id}:{window}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return MetricsSummary.model_validate_json(cached)
 
     if db.get(Workload, workload_id) is None:
         raise HTTPException(
@@ -96,7 +104,7 @@ def metrics_summary(
     errors = sum(1 for s in in_window if s.status == "error")
     latencies = [s.latency_ms for s in in_window]
 
-    return MetricsSummary(
+    summary = MetricsSummary(
         workload_id=workload_id,
         window=window,
         request_count=count,
@@ -105,6 +113,8 @@ def metrics_summary(
         latency_p50_ms=percentile(latencies, 50),
         latency_p95_ms=percentile(latencies, 95),
     )
+    cache.set(cache_key, summary.model_dump_json(), settings.summary_cache_ttl_seconds)
+    return summary
 
 
 @router.get("/metrics/timeseries", response_model=MetricsTimeseries)

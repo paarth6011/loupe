@@ -83,3 +83,29 @@ def test_summary_unknown_workload(client, auth_headers):
 def test_summary_requires_auth(client):
     out = client.get("/metrics/summary?workload_id=1&window=1h")
     assert out.status_code == 401
+
+
+def test_summary_is_cached_within_ttl(client, auth_headers):
+    """A second identical request is served from cache, so new samples between
+    the two calls don't change the result; a different window bypasses it."""
+    resp = None
+    for lat in [100, 200]:
+        resp = _ingest(client, auth_headers, "cache-wl", lat)
+    workload_id = resp.json()["sample"]["workload_id"]
+
+    first = client.get(
+        f"/metrics/summary?workload_id={workload_id}&window=1h", headers=auth_headers
+    ).json()
+    assert first["request_count"] == 2
+
+    _ingest(client, auth_headers, "cache-wl", 300)  # new sample, not yet visible
+    cached = client.get(
+        f"/metrics/summary?workload_id={workload_id}&window=1h", headers=auth_headers
+    ).json()
+    assert cached["request_count"] == 2  # served from cache
+
+    # A different window is a different cache key -> freshly computed.
+    fresh = client.get(
+        f"/metrics/summary?workload_id={workload_id}&window=15m", headers=auth_headers
+    ).json()
+    assert fresh["request_count"] == 3

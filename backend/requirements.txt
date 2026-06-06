@@ -10,6 +10,7 @@ passlib==1.7.4
 # Pinned: passlib 1.7.4 is incompatible with bcrypt >= 4.1 (backend self-test crash).
 bcrypt==4.0.1
 python-multipart==0.0.20
+redis==5.2.1
 
 # Tests
 pytest==8.3.4

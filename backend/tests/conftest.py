@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.cache import InMemoryCache, get_cache
 from app.database import Base, get_db
 from app.main import app
 from app import models as _models  # noqa: F401  (register tables on Base.metadata)
@@ -36,7 +37,9 @@ def client(db_session: Session) -> Iterator[TestClient]:
     def override_get_db() -> Iterator[Session]:
         yield db_session
 
+    cache = InMemoryCache()
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_cache] = lambda: cache
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     error_rate_window: int = 20  # number of most-recent samples to consider
     error_rate_min_samples: int = 5  # need at least this many before evaluating rate
 
+    # Redis cache (Phase 2)
+    redis_url: str = "redis://redis:6379/0"
+    summary_cache_ttl_seconds: int = 15
+
 
 @lru_cache
 def get_settings() -> Settings:
