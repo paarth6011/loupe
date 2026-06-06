@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+psycopg://cloudops:cloudops@db:5432/cloudops"
 
+    # Comma-separated allowed CORS origins (frontend URL in prod).
+    cors_origins: str = "http://localhost:5173"
+
     # Auth
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"

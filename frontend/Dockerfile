@@ -4,6 +4,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# Vite inlines VITE_API_URL at build time. Defaults to local; set to the backend
+# Cloud Run URL when building the production image (see DEPLOYMENT.md).
+ARG VITE_API_URL=http://localhost:8000
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Unprivileged nginx: runs as non-root (uid 101), listens on $PORT (default 8080).

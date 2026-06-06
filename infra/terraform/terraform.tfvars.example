@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Image refs — built and pushed before `terraform apply` (see DEPLOYMENT.md).
+# Format: REGION-docker.pkg.dev/PROJECT/cloudops-images/NAME:TAG
+backend_image  = "us-central1-docker.pkg.dev/your-gcp-project-id/cloudops-images/backend:v1"
+frontend_image = "us-central1-docker.pkg.dev/your-gcp-project-id/cloudops-images/frontend:v1"
+
+admin_password = "change-me"
+
+# Optional: real Claude summaries. Empty string uses the template fallback.
+anthropic_api_key = ""
+
+# Set to the frontend URL after the first apply, then re-apply (see DEPLOYMENT.md).
+cors_origins = "http://localhost:5173"

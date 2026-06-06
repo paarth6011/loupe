@@ -1,14 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
 from app.routers import alerts, auth, health, metrics, workloads
 
 app = FastAPI(title="Cloud Ops Dashboard API", version="0.1.0")
 
-# Frontend dev server (Vite) runs on 5173 locally.
+# Allowed origins come from config (localhost in dev; the frontend URL in prod).
+_origins = [o.strip() for o in get_settings().cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
