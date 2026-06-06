@@ -13,4 +13,5 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command: migrate then serve. Compose overrides this in dev (adds --reload).
+CMD ["sh", "start.sh"]
