@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = "admin"
 
+    # Alerting thresholds (evaluated on ingest)
+    latency_threshold_ms: int = 1000
+    error_rate_threshold: float = 0.5  # fraction of recent samples that are errors
+    error_rate_window: int = 20  # number of most-recent samples to consider
+    error_rate_min_samples: int = 5  # need at least this many before evaluating rate
+
 
 @lru_cache
 def get_settings() -> Settings:
