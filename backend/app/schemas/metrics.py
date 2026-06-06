@@ -28,3 +28,13 @@ class MetricSampleOut(BaseModel):
 class MetricIngestResponse(BaseModel):
     sample: MetricSampleOut
     triggered_alerts: list[AlertOut]
+
+
+class MetricsSummary(BaseModel):
+    workload_id: int
+    window: str
+    request_count: int
+    error_count: int
+    error_rate: float
+    latency_p50_ms: float | None
+    latency_p95_ms: float | None
