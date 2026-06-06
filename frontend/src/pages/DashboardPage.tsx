@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { listAlerts } from "../api/alerts";
 import { ApiError } from "../api/client";
-import { getSummary } from "../api/metrics";
+import { getSummary, getTimeseries } from "../api/metrics";
 import { listWorkloads } from "../api/workloads";
 import AlertsPanel from "../components/AlertsPanel";
 import ErrorRateChart, { type ErrorPoint } from "../components/ErrorRateChart";
@@ -11,8 +11,20 @@ import SummaryCards from "../components/SummaryCards";
 import type { Alert, MetricsSummary, Workload } from "../types";
 
 const WINDOWS = ["15m", "1h", "24h"];
+// Bucket granularity per window — keeps each chart around 12–48 points.
+const BUCKET_FOR: Record<string, string> = {
+  "15m": "1m",
+  "1h": "5m",
+  "24h": "30m",
+};
 const POLL_MS = 3000;
-const MAX_POINTS = 40;
+
+function formatBucket(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   const [workloads, setWorkloads] = useState<Workload[]>([]);
@@ -54,9 +66,11 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
     let active = true;
 
     async function tick(workloadId: number) {
+      const bucket = BUCKET_FOR[timeWindow] ?? "5m";
       try {
-        const [s, a, wls] = await Promise.all([
+        const [s, ts, a, wls] = await Promise.all([
           getSummary(workloadId, timeWindow),
+          getTimeseries(workloadId, timeWindow, bucket),
           listAlerts(),
           listWorkloads(),
         ]);
@@ -65,16 +79,20 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
         setAlerts(a);
         setWorkloads(wls);
         setError(null);
-        const t = new Date().toLocaleTimeString();
-        setLatency((prev) =>
-          [...prev, { time: t, p50: s.latency_p50_ms, p95: s.latency_p95_ms }].slice(
-            -MAX_POINTS,
-          ),
+        // Charts come straight from the bucketed history endpoint, so they're
+        // fully populated on load and survive a refresh.
+        setLatency(
+          ts.points.map((p) => ({
+            time: formatBucket(p.bucket_start),
+            p50: p.latency_p50_ms,
+            p95: p.latency_p95_ms,
+          })),
         );
-        setErrors((prev) =>
-          [...prev, { time: t, errorRate: +(s.error_rate * 100).toFixed(2) }].slice(
-            -MAX_POINTS,
-          ),
+        setErrors(
+          ts.points.map((p) => ({
+            time: formatBucket(p.bucket_start),
+            errorRate: +(p.error_rate * 100).toFixed(2),
+          })),
         );
       } catch (e) {
         if (active) handleError(e);
