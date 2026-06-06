@@ -17,6 +17,9 @@ services:
 
   backend:
     build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://cloudops:cloudops@db:5432/cloudops}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
