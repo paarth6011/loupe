@@ -41,6 +41,36 @@ def test_high_error_rate_triggers_alert(client, auth_headers):
     assert "high_error_rate" in rules_seen
 
 
+def test_high_latency_alert_auto_resolves(client, auth_headers):
+    """A latency spike opens an alert; normal samples then resolve it."""
+    from app.config import Settings, get_settings
+    from app.main import app
+
+    # Small recent window so the spike ages out after a few normal samples.
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        error_rate_window=3, error_rate_min_samples=3, latency_threshold_ms=1000
+    )
+    try:
+        spike = _post_metric(client, auth_headers, latency_ms=5000)
+        assert any(
+            a["rule"] == "high_latency" for a in spike.json()["triggered_alerts"]
+        )
+
+        last = None
+        for _ in range(3):  # push the spike out of the size-3 window
+            last = _post_metric(client, auth_headers, latency_ms=50)
+        assert any(
+            a["rule"] == "high_latency" for a in last.json()["resolved_alerts"]
+        )
+
+        resolved = client.get("/alerts?resolved=true", headers=auth_headers).json()
+        assert any(a["rule"] == "high_latency" for a in resolved)
+        open_alerts = client.get("/alerts?resolved=false", headers=auth_headers).json()
+        assert all(a["rule"] != "high_latency" for a in open_alerts)
+    finally:
+        del app.dependency_overrides[get_settings]
+
+
 def test_ingest_requires_auth(client):
     resp = _post_metric(client, {})  # no auth header
     assert resp.status_code == 401

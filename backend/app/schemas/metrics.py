@@ -28,6 +28,7 @@ class MetricSampleOut(BaseModel):
 class MetricIngestResponse(BaseModel):
     sample: MetricSampleOut
     triggered_alerts: list[AlertOut]
+    resolved_alerts: list[AlertOut] = []
 
 
 class MetricsSummary(BaseModel):

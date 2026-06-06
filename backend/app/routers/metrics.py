@@ -57,11 +57,13 @@ def ingest_metric(
     db.add(sample)
     db.flush()  # assign id + server-default ts and make it visible to threshold queries
 
-    triggered = evaluate_thresholds(db, sample, settings)
+    opened, resolved = evaluate_thresholds(db, sample, settings)
 
     db.commit()
     db.refresh(sample)
-    return MetricIngestResponse(sample=sample, triggered_alerts=triggered)
+    return MetricIngestResponse(
+        sample=sample, triggered_alerts=opened, resolved_alerts=resolved
+    )
 
 
 @router.get("/metrics/summary", response_model=MetricsSummary)
