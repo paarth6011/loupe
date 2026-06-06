@@ -10,5 +10,7 @@ class AlertOut(BaseModel):
     workload_id: int
     rule: str
     message: str
+    severity: str
+    summary: str | None
     triggered_at: datetime
     resolved_at: datetime | None

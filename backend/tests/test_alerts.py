@@ -19,6 +19,16 @@ def test_list_alerts_after_high_latency(client, auth_headers):
     assert len(body) == 1
     assert body[0]["rule"] == "high_latency"
     assert body[0]["resolved_at"] is None
+    assert body[0]["summary"] is None  # filled in later by the LLM
+
+
+def test_high_latency_severity_scales_with_magnitude(client, auth_headers):
+    # 1.5x threshold -> warning
+    warn = _ingest(client, auth_headers, "sev-warn", latency=1500)
+    assert warn.json()["triggered_alerts"][0]["severity"] == "warning"
+    # 5x threshold -> critical
+    crit = _ingest(client, auth_headers, "sev-crit", latency=5000)
+    assert crit.json()["triggered_alerts"][0]["severity"] == "critical"
 
 
 def test_alerts_filter_by_workload(client, auth_headers):

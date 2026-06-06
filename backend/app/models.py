@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -49,6 +49,11 @@ class Alert(Base):
     )
     rule: Mapped[str] = mapped_column(String(64), nullable=False)
     message: Mapped[str] = mapped_column(String(512), nullable=False)
+    severity: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="warning"
+    )  # "info" | "warning" | "critical"
+    # Plain-English incident summary, populated asynchronously by the LLM.
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     triggered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
