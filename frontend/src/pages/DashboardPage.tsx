@@ -10,12 +10,15 @@ import LatencyChart, { type LatencyPoint } from "../components/LatencyChart";
 import SummaryCards from "../components/SummaryCards";
 import type { Alert, MetricsSummary, Workload } from "../types";
 
-const WINDOWS = ["15m", "1h", "24h"];
+const WINDOWS = ["5m", "15m", "1h", "6h", "24h", "7d"];
 // Bucket granularity per window — keeps each chart around 12–48 points.
 const BUCKET_FOR: Record<string, string> = {
+  "5m": "15s",
   "15m": "1m",
   "1h": "5m",
+  "6h": "15m",
   "24h": "30m",
+  "7d": "6h",
 };
 const POLL_MS = 3000;
 
