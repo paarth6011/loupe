@@ -25,8 +25,8 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] `LICENSE` (MIT)
 - [x] `CONTRIBUTING.md`, `SECURITY.md`
 - [x] CI (tests + build on PRs)
-- [ ] Remove default credentials (`admin`/`admin`, `change-me` JWT secret) — force a
-      generated/first-run secret; refuse to boot with defaults in prod
+- [x] Refuse to boot in production with default credentials (`admin`/`admin`,
+      `change-me` JWT secret) — enforced via `ENVIRONMENT=production`
 - [ ] Published, versioned container images (GHCR) + tagged releases
 - [ ] Lint/format in CI (ruff, prettier)
 - [ ] Configurable monitors/thresholds via the UI/API (not just env vars)

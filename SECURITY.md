@@ -9,6 +9,10 @@ deployment**. Change these before putting it on any reachable network:
   strong `ADMIN_PASSWORD` (and ideally a non-default `ADMIN_USERNAME`).
 - **JWT secret.** `JWT_SECRET` defaults to `change-me-in-prod`. Set a long random
   value; anyone who knows it can forge sessions.
+
+> **Enforced:** with `ENVIRONMENT=production`, the backend **refuses to start** if
+> `JWT_SECRET` or `ADMIN_PASSWORD` is still the insecure default. Local dev
+> (`ENVIRONMENT=dev`, the default) allows them but logs a warning.
 - **Secrets in env.** Don't commit real secrets. In a real deployment use a
   secret manager (the GCP Terraform in `infra/` uses Secret Manager).
 - **TLS.** Terminate HTTPS in front of the services (load balancer / reverse
