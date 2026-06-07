@@ -93,6 +93,10 @@ class TimeseriesPoint(BaseModel):
     error_rate: float
     latency_p50_ms: float | None
     latency_p95_ms: float | None
+    # LLM throughput/spend per bucket (default 0 so HTTP-only buckets are valid).
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
 
 
 class MetricsTimeseries(BaseModel):

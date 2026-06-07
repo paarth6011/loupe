@@ -33,6 +33,40 @@ def test_timeseries_buckets_and_counts(client, auth_headers):
     assert points[0]["latency_p50_ms"] is None
 
 
+def test_timeseries_sums_tokens_and_cost_per_bucket(client, auth_headers):
+    """Per-bucket token/cost rollups land alongside latency stats."""
+    resp = None
+    for _ in range(2):
+        resp = client.post(
+            "/metrics",
+            json={
+                "workload": "ts-llm",
+                "latency_ms": 120,
+                "status": "ok",
+                "model": "gpt-4o",
+                "input_tokens": 100,
+                "output_tokens": 40,
+            },
+            headers=auth_headers,
+        )
+    workload_id = resp.json()["sample"]["workload_id"]
+
+    out = client.get(
+        f"/metrics/timeseries?workload_id={workload_id}&window=1h&bucket=5m",
+        headers=auth_headers,
+    )
+    assert out.status_code == 200
+    points = out.json()["points"]
+    last = points[-1]
+    assert last["input_tokens"] == 200
+    assert last["output_tokens"] == 80
+    # gpt-4o: 200 in * $2.5/M + 80 out * $10/M = 0.0005 + 0.0008
+    assert last["cost_usd"] == 0.0013
+    # Empty buckets default to zeroed token/cost stats.
+    assert points[0]["input_tokens"] == 0
+    assert points[0]["cost_usd"] == 0.0
+
+
 def test_timeseries_bucket_larger_than_window(client, auth_headers):
     resp = _ingest(client, auth_headers, "ts-wl2", 50)
     workload_id = resp.json()["sample"]["workload_id"]

@@ -254,6 +254,9 @@ def metrics_timeseries(
                 error_rate=round(errors / count, 4) if count else 0.0,
                 latency_p50_ms=percentile(latencies, 50),
                 latency_p95_ms=percentile(latencies, 95),
+                input_tokens=sum(s.input_tokens or 0 for s in group),
+                output_tokens=sum(s.output_tokens or 0 for s in group),
+                cost_usd=round(sum(s.cost_usd or 0.0 for s in group), 6),
             )
         )
 

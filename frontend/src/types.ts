@@ -23,6 +23,9 @@ export interface MetricsSummary {
   error_rate: number;
   latency_p50_ms: number | null;
   latency_p95_ms: number | null;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cost_usd: number;
 }
 
 export interface TimeseriesPoint {
@@ -31,6 +34,35 @@ export interface TimeseriesPoint {
   error_rate: number;
   latency_p50_ms: number | null;
   latency_p95_ms: number | null;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
+export interface CostByModel {
+  model: string;
+  provider: string | null;
+  requests: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
+export interface CostByWorkload {
+  workload_id: number;
+  workload: string;
+  requests: number;
+  cost_usd: number;
+}
+
+export interface CostSummary {
+  window: string;
+  total_requests: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cost_usd: number;
+  by_model: CostByModel[];
+  by_workload: CostByWorkload[];
 }
 
 export interface MetricsTimeseries {

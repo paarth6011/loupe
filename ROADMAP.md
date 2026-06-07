@@ -44,7 +44,10 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] A Python SDK (`sdk/`): wrap an Anthropic/OpenAI client to auto-record
       latency/tokens/cost/errors (`track(anthropic.Anthropic(), workload="…")`);
       non-blocking, safe. Async/streaming still to come.
-- [ ] Dashboard panels for token throughput and cost-over-time; per-model breakdown
+- [x] Dashboard panels for token throughput and cost-over-time (per selected
+      workload) plus an account-wide spend breakdown by model and workload
+      (`GET /metrics/cost`); the timeseries endpoint now also returns per-bucket
+      tokens + cost
 - [ ] LLM-tuned alerts: cost spikes, rate-limit surges, token anomalies
 - [ ] Pluggable summarizer incl. local models (Ollama) so the AI feature is $0
 - [ ] Public read-only status page

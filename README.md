@@ -55,7 +55,9 @@ automatically on first boot.
 - `POST /auth/login` → JWT
 - `POST /metrics` (auth) — ingest a sample; evaluates thresholds on insert
 - `GET  /workloads` (auth)
-- `GET  /metrics/summary?workload_id=&window=` (auth) — p50/p95, error rate, count
+- `GET  /metrics/summary?workload_id=&window=` (auth) — p50/p95, error rate, count, tokens, cost
+- `GET  /metrics/timeseries?workload_id=&window=&bucket=` (auth) — bucketed latency/errors + tokens/cost
+- `GET  /metrics/cost?window=` (auth) — account-wide spend, broken down by model and workload
 - `GET  /alerts` (auth) — supports `?workload_id=` and `?resolved=` filters
 
 ## Tests

@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import type { MetricsSummary, MetricsTimeseries } from "../types";
+import type { CostSummary, MetricsSummary, MetricsTimeseries } from "../types";
 
 export function getSummary(
   workloadId: number,
@@ -25,4 +25,9 @@ export function getTimeseries(
   return apiFetch<MetricsTimeseries>(
     `/metrics/timeseries?${params.toString()}`,
   );
+}
+
+export function getCost(window: string): Promise<CostSummary> {
+  const params = new URLSearchParams({ window });
+  return apiFetch<CostSummary>(`/metrics/cost?${params.toString()}`);
 }

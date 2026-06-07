@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 
 import { listAlerts } from "../api/alerts";
 import { ApiError } from "../api/client";
-import { getSummary, getTimeseries } from "../api/metrics";
+import { getCost, getSummary, getTimeseries } from "../api/metrics";
 import { listWorkloads } from "../api/workloads";
 import AlertsPanel from "../components/AlertsPanel";
+import CostBreakdown from "../components/CostBreakdown";
+import CostChart, { type CostPoint } from "../components/CostChart";
 import ErrorRateChart, { type ErrorPoint } from "../components/ErrorRateChart";
 import LatencyChart, { type LatencyPoint } from "../components/LatencyChart";
 import SummaryCards from "../components/SummaryCards";
-import type { Alert, MetricsSummary, Workload } from "../types";
+import TokenChart, { type TokenPoint } from "../components/TokenChart";
+import type { Alert, CostSummary, MetricsSummary, Workload } from "../types";
 
 const WINDOWS = ["5m", "15m", "1h", "6h", "24h", "7d"];
 // Bucket granularity per window — keeps each chart around 12–48 points.
@@ -37,6 +40,9 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [latency, setLatency] = useState<LatencyPoint[]>([]);
   const [errors, setErrors] = useState<ErrorPoint[]>([]);
+  const [tokens, setTokens] = useState<TokenPoint[]>([]);
+  const [costSeries, setCostSeries] = useState<CostPoint[]>([]);
+  const [cost, setCost] = useState<CostSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleError(e: unknown) {
@@ -61,6 +67,8 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     setLatency([]);
     setErrors([]);
+    setTokens([]);
+    setCostSeries([]);
   }, [selectedId, timeWindow]);
 
   // Poll summary + alerts, accumulating a client-side time-series.
@@ -71,14 +79,16 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
     async function tick(workloadId: number) {
       const bucket = BUCKET_FOR[timeWindow] ?? "5m";
       try {
-        const [s, ts, a, wls] = await Promise.all([
+        const [s, ts, c, a, wls] = await Promise.all([
           getSummary(workloadId, timeWindow),
           getTimeseries(workloadId, timeWindow, bucket),
+          getCost(timeWindow),
           listAlerts(),
           listWorkloads(),
         ]);
         if (!active) return;
         setSummary(s);
+        setCost(c);
         setAlerts(a);
         setWorkloads(wls);
         setError(null);
@@ -97,6 +107,19 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
             errorRate: +(p.error_rate * 100).toFixed(2),
           })),
         );
+        setTokens(
+          ts.points.map((p) => ({
+            time: formatBucket(p.bucket_start),
+            input: p.input_tokens,
+            output: p.output_tokens,
+          })),
+        );
+        setCostSeries(
+          ts.points.map((p) => ({
+            time: formatBucket(p.bucket_start),
+            cost: p.cost_usd,
+          })),
+        );
       } catch (e) {
         if (active) handleError(e);
       }
@@ -111,6 +134,13 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   }, [selectedId, timeWindow]);
 
   const selected = workloads.find((w) => w.id === selectedId) ?? null;
+  // Only show token/cost charts for workloads that actually report LLM usage,
+  // so HTTP-only workloads keep the lean latency/error view.
+  const isLlm =
+    summary != null &&
+    (summary.total_cost_usd > 0 ||
+      summary.total_input_tokens > 0 ||
+      summary.total_output_tokens > 0);
 
   return (
     <div className="app">
@@ -149,6 +179,13 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
           <SummaryCards summary={summary} />
           <LatencyChart data={latency} />
           <ErrorRateChart data={errors} />
+          {isLlm ? (
+            <>
+              <CostChart data={costSeries} />
+              <TokenChart data={tokens} />
+            </>
+          ) : null}
+          <CostBreakdown cost={cost} />
         </section>
         <aside className="side-col">
           <AlertsPanel alerts={alerts} workloads={workloads} />

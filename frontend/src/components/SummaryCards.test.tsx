@@ -15,6 +15,9 @@ describe("SummaryCards", () => {
           error_rate: 0.05,
           latency_p50_ms: 210,
           latency_p95_ms: 480,
+          total_input_tokens: 0,
+          total_output_tokens: 0,
+          total_cost_usd: 0,
         }}
       />,
     );
