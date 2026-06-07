@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from loupe import track
+from loupe import Reporter, track
 
 
 class CapturingReporter:
@@ -116,3 +116,25 @@ def test_passthrough_for_unwrapped_attributes():
 def test_unknown_provider_raises():
     with pytest.raises(ValueError):
         track(object(), workload="x", reporter=CapturingReporter())
+
+
+class FakeHttpClient:
+    def __init__(self):
+        self.posts = []
+
+    def post(self, url, json=None, headers=None):
+        self.posts.append((url, json, headers))
+        return SimpleNamespace(status_code=201, json=lambda: {})
+
+
+def test_reporter_uses_api_key_header_and_skips_login():
+    rep = Reporter(url="http://x", api_key="loupe_sk_test")
+    rep._client = FakeHttpClient()
+    rep._send({"workload": "w", "latency_ms": 1, "status": "ok"})
+
+    posts = rep._client.posts
+    assert len(posts) == 1  # no login round-trip
+    url, _, headers = posts[0]
+    assert url.endswith("/metrics")
+    assert headers == {"X-API-Key": "loupe_sk_test"}
+    assert all("/auth/login" not in p[0] for p in posts)

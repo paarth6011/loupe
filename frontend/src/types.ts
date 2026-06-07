@@ -85,6 +85,18 @@ export interface Monitor {
   effective_threshold: number;
 }
 
+export interface ApiKey {
+  id: number;
+  name: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  key: string; // full plaintext, returned only once at creation
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

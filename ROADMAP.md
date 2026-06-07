@@ -27,6 +27,9 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] CI (tests + build on PRs)
 - [x] Refuse to boot in production with default credentials (`admin`/`admin`,
       `change-me` JWT secret) — enforced via `ENVIRONMENT=production`
+- [x] Per-source ingestion API keys (`X-API-Key`) for `POST /metrics` — revocable,
+      hashed at rest, managed in the dashboard / `/apikeys`; the admin JWT stays
+      valid for the dashboard and manual posting
 - [ ] Published, versioned container images (GHCR) + tagged releases
 - [x] Lint/format in CI (ruff, prettier)
 - [x] Configurable monitors/thresholds via the UI/API (not just env vars):

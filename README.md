@@ -36,6 +36,9 @@ client = track(anthropic.Anthropic(), workload="support-bot")
 # use `client` exactly as before — calls are now observed
 ```
 
+Create a per-source ingestion key in the dashboard (**🔑 API keys**) and set
+`LOUPE_API_KEY` so the SDK authenticates without the admin password.
+
 ## Services & ports
 
 | Service     | URL / port              | What it is                                 |
@@ -53,7 +56,8 @@ automatically on first boot.
 
 - `GET  /health`
 - `POST /auth/login` → JWT
-- `POST /metrics` (auth) — ingest a sample; evaluates thresholds on insert
+- `POST /metrics` (auth: API key via `X-API-Key`, or admin JWT) — ingest a sample; evaluates thresholds on insert
+- `POST /apikeys` · `GET /apikeys` · `DELETE /apikeys/{id}` (admin JWT) — manage ingestion keys
 - `GET  /workloads` (auth)
 - `GET  /metrics/summary?workload_id=&window=` (auth) — p50/p95, error rate, count, tokens, cost
 - `GET  /metrics/timeseries?workload_id=&window=&bucket=` (auth) — bucketed latency/errors + tokens/cost

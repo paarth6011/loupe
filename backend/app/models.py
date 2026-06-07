@@ -91,6 +91,33 @@ class Alert(Base):
     workload: Mapped["Workload"] = relationship(back_populates="alerts")
 
 
+class ApiKey(Base):
+    """A revocable ingestion credential for `POST /metrics`.
+
+    Only a SHA-256 hash of the key is stored; the plaintext is shown once at
+    creation and never again. ``prefix`` keeps a short, non-secret slice for
+    display so a key can be recognised in the UI.
+    """
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(32), nullable=False)
+    key_hash: Mapped[str] = mapped_column(
+        String(64), unique=True, index=True, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class Monitor(Base):
     """A per-workload override for one alert rule.
 

@@ -5,6 +5,7 @@ import { ApiError } from "../api/client";
 import { getCost, getSummary, getTimeseries } from "../api/metrics";
 import { listWorkloads } from "../api/workloads";
 import AlertsPanel from "../components/AlertsPanel";
+import ApiKeysPanel from "../components/ApiKeysPanel";
 import CostBreakdown from "../components/CostBreakdown";
 import CostChart, { type CostPoint } from "../components/CostChart";
 import ErrorRateChart, { type ErrorPoint } from "../components/ErrorRateChart";
@@ -46,6 +47,7 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showMonitors, setShowMonitors] = useState(false);
+  const [showKeys, setShowKeys] = useState(false);
 
   // Stable across renders so it can sit in child effect deps without causing
   // a refetch on every poll (which would otherwise wipe in-progress edits).
@@ -183,6 +185,9 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
         >
           ⚙ Monitors
         </button>
+        <button className="secondary" onClick={() => setShowKeys(true)}>
+          🔑 API keys
+        </button>
         <button onClick={onLogout}>Log out</button>
       </header>
 
@@ -191,6 +196,13 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
           workloadId={selected.id}
           workloadName={selected.name}
           onClose={() => setShowMonitors(false)}
+          onError={handleError}
+        />
+      ) : null}
+
+      {showKeys ? (
+        <ApiKeysPanel
+          onClose={() => setShowKeys(false)}
           onError={handleError}
         />
       ) : null}

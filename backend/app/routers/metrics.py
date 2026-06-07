@@ -10,7 +10,7 @@ from app.alerting import evaluate_thresholds
 from app.cache import Cache, get_cache
 from app.config import Settings, get_settings
 from app.database import get_db, get_session_factory
-from app.deps import get_current_user
+from app.deps import get_current_user, require_ingest_auth
 from app.models import MetricSample, Workload
 from app.notifications import AlertEvent, Notifier, get_notifier
 from app.pricing import compute_cost
@@ -58,7 +58,7 @@ def ingest_metric(
     summarizer: Summarizer = Depends(get_summarizer),
     notifier: Notifier = Depends(get_notifier),
     session_factory: sessionmaker = Depends(get_session_factory),
-    _: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_ingest_auth),
 ) -> MetricIngestResponse:
     workload = _get_or_create_workload(db, body.workload)
 

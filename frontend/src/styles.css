@@ -445,6 +445,75 @@ select {
   margin-top: 4px;
 }
 
+/* ---------- API keys ---------- */
+.key-create {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.key-create input {
+  flex: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+.key-reveal {
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.key-reveal-label {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.key-reveal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.key-value {
+  flex: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  word-break: break-all;
+}
+.keys-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.keys-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.keys-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(39, 50, 74, 0.5);
+}
+.keys-table code {
+  font-size: 12px;
+}
+button.danger {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
 /* ---------- Misc ---------- */
 .error-banner {
   background: rgba(248, 113, 113, 0.12);

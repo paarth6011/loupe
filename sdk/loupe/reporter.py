@@ -11,8 +11,12 @@ class Reporter:
 
     Reporting is non-blocking (fire-and-forget on a daemon thread) and never
     raises into the caller's code path — observability must not break the app.
-    Authentication is a simple username/password login for now; API keys come
-    in a later step.
+
+    Auth, in order of preference:
+      1. ``api_key`` — a revocable ingestion key (recommended; sent as
+         ``X-API-Key``). No login round-trip.
+      2. ``token`` — a pre-obtained bearer JWT.
+      3. ``username`` / ``password`` — admin login, exchanged for a JWT.
     """
 
     def __init__(
@@ -21,12 +25,14 @@ class Reporter:
         username: str = "admin",
         password: str = "admin",
         token: str | None = None,
+        api_key: str | None = None,
         timeout: float = 3.0,
     ) -> None:
         self._url = url.rstrip("/")
         self._username = username
         self._password = password
         self._token = token
+        self._api_key = api_key
         self._client = httpx.Client(timeout=timeout)
 
     @classmethod
@@ -36,6 +42,7 @@ class Reporter:
             username=os.environ.get("LOUPE_USERNAME", "admin"),
             password=os.environ.get("LOUPE_PASSWORD", "admin"),
             token=os.environ.get("LOUPE_TOKEN"),
+            api_key=os.environ.get("LOUPE_API_KEY"),
         )
 
     def report(self, **fields) -> None:
@@ -53,11 +60,20 @@ class Reporter:
         self._token = resp.json()["access_token"]
 
     def _post(self, payload: dict) -> httpx.Response:
-        headers = {"Authorization": f"Bearer {self._token}"} if self._token else {}
+        if self._api_key:
+            headers = {"X-API-Key": self._api_key}
+        elif self._token:
+            headers = {"Authorization": f"Bearer {self._token}"}
+        else:
+            headers = {}
         return self._client.post(f"{self._url}/metrics", json=payload, headers=headers)
 
     def _send(self, payload: dict) -> None:
         try:
+            # API keys don't expire and need no login handshake.
+            if self._api_key:
+                self._post(payload)
+                return
             if not self._token:
                 self._login()
             resp = self._post(payload)

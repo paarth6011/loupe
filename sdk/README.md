@@ -33,15 +33,25 @@ client.chat.completions.create(model="gpt-4o", messages=[...])
 | Var | Default | Meaning |
 |-----|---------|---------|
 | `LOUPE_URL` | `http://localhost:8000` | Loupe backend URL |
-| `LOUPE_USERNAME` / `LOUPE_PASSWORD` | `admin` / `admin` | login for now (API keys later) |
-| `LOUPE_TOKEN` | — | use a pre-obtained bearer token instead of login |
+| `LOUPE_API_KEY` | — | **recommended** — a per-source ingestion key (sent as `X-API-Key`) |
+| `LOUPE_TOKEN` | — | use a pre-obtained bearer JWT instead |
+| `LOUPE_USERNAME` / `LOUPE_PASSWORD` | `admin` / `admin` | admin login fallback (dev only) |
 
-Or pass a configured `Reporter`:
+Create a key in the dashboard (**🔑 API keys**) or via `POST /apikeys`, then:
+
+```bash
+export LOUPE_API_KEY=loupe_sk_…
+```
+
+An API key is preferred over the admin login: it's scoped to ingestion,
+revocable per source, and needs no login round-trip. Or pass a configured
+`Reporter`:
 
 ```python
 from loupe import Reporter, track
 client = track(anthropic.Anthropic(), workload="bot",
-               reporter=Reporter(url="https://loupe.internal"))
+               reporter=Reporter(url="https://loupe.internal",
+                                 api_key="loupe_sk_…"))
 ```
 
 ## Notes
