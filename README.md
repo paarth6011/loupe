@@ -72,6 +72,18 @@ All config is via environment variables (see `.env.example`): database URL, JWT
 settings, the single admin user, and the alerting thresholds
 (`LATENCY_THRESHOLD_MS`, `ERROR_RATE_THRESHOLD`, …).
 
+**LLM-tuned alerts** add three rules on top of latency/error-rate, evaluated on
+ingest and tunable via env vars:
+
+| Rule | Fires when | Threshold var |
+|---|---|---|
+| `cost_spike` | a single call costs more than the ceiling | `COST_PER_REQUEST_THRESHOLD_USD` (default `1.0`) |
+| `token_spike` | a single call uses more tokens (in+out) than the ceiling | `TOKEN_PER_REQUEST_THRESHOLD` (default `100000`) |
+| `rate_limit_surge` | a share of recent calls are provider 429s | `RATE_LIMIT_THRESHOLD` (default `0.2`) |
+
+These read the LLM sample fields and stay dormant for HTTP-only workloads, where
+those fields are null.
+
 **Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
 webhook to get pinged when an alert fires or resolves. The payload includes
 `text` (Slack), `content` (Discord), and structured `alert` fields; empty

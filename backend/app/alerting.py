@@ -106,4 +106,85 @@ def evaluate_thresholds(
         resolved,
     )
 
+    # --- LLM-tuned rules ----------------------------------------------------
+    # These read the LLM-specific fields and are naturally dormant for HTTP
+    # workloads, where cost_usd / tokens / error_type are null: max(...) falls
+    # back to 0 and the rate-limit fraction is 0, so they never fire.
+
+    # Rule: cost_spike — a single call costing more than the per-request ceiling
+    # (catches runaway max_tokens or an exploded context window).
+    costs = [s.cost_usd for s in recent if s.cost_usd is not None]
+    max_cost = max(costs, default=0.0)
+    cost_severity = (
+        "critical"
+        if max_cost >= 3 * settings.cost_per_request_threshold_usd
+        else "warning"
+    )
+    cost_message = (
+        f"a request cost ${max_cost:.4f}, over the "
+        f"${settings.cost_per_request_threshold_usd:.2f} per-call ceiling"
+    )
+    _reconcile(
+        db,
+        sample.workload_id,
+        "cost_spike",
+        max_cost > settings.cost_per_request_threshold_usd,
+        cost_message,
+        cost_severity,
+        opened,
+        resolved,
+    )
+
+    # Rule: token_spike — a single call burning more tokens (in+out) than the
+    # ceiling; an explainable stand-in until per-workload baselines (step 7).
+    token_totals = [
+        (s.input_tokens or 0) + (s.output_tokens or 0)
+        for s in recent
+        if s.input_tokens is not None or s.output_tokens is not None
+    ]
+    max_tokens = max(token_totals, default=0)
+    token_severity = (
+        "critical"
+        if max_tokens >= 3 * settings.token_per_request_threshold
+        else "warning"
+    )
+    token_message = (
+        f"a request used {max_tokens:,} tokens, over the "
+        f"{settings.token_per_request_threshold:,} per-call ceiling"
+    )
+    _reconcile(
+        db,
+        sample.workload_id,
+        "token_spike",
+        max_tokens > settings.token_per_request_threshold,
+        token_message,
+        token_severity,
+        opened,
+        resolved,
+    )
+
+    # Rule: rate_limit_surge — provider 429s clustering in the recent window.
+    rl_firing = False
+    rl_message = ""
+    rl_severity = "warning"
+    if len(recent) >= settings.rate_limit_min_samples:
+        rate_limited = sum(1 for s in recent if s.error_type == "rate_limit")
+        frac = rate_limited / len(recent)
+        rl_firing = frac >= settings.rate_limit_threshold
+        rl_severity = "critical" if frac >= 0.5 else "warning"
+        rl_message = (
+            f"{frac:.0%} of the last {len(recent)} calls were rate-limited "
+            f"(over the {settings.rate_limit_threshold:.0%} threshold)"
+        )
+    _reconcile(
+        db,
+        sample.workload_id,
+        "rate_limit_surge",
+        rl_firing,
+        rl_message,
+        rl_severity,
+        opened,
+        resolved,
+    )
+
     return opened, resolved

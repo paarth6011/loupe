@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     error_rate_window: int = 20  # number of most-recent samples to consider
     error_rate_min_samples: int = 5  # need at least this many before evaluating rate
 
+    # LLM-specific alerting thresholds. These rules read the LLM sample fields
+    # (cost_usd, tokens, error_type) and stay dormant for HTTP-only workloads,
+    # where those fields are null.
+    cost_per_request_threshold_usd: float = 1.0  # a single call over this is unusual
+    token_per_request_threshold: int = 100_000  # tokens (in+out) for one call
+    rate_limit_threshold: float = 0.2  # fraction of recent calls that are 429s
+    rate_limit_min_samples: int = 5  # need at least this many before evaluating
+
     # Redis cache (Phase 2)
     redis_url: str = "redis://redis:6379/0"
     summary_cache_ttl_seconds: int = 15

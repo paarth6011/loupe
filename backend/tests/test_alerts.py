@@ -52,3 +52,50 @@ def test_alerts_filter_resolved_flag(client, auth_headers):
 
 def test_list_alerts_requires_auth(client):
     assert client.get("/alerts").status_code == 401
+
+
+# --- LLM-tuned rules --------------------------------------------------------
+
+
+def _ingest_llm(client, headers, workload, **fields):
+    body = {"workload": workload, "latency_ms": 50, "status": "ok"}
+    body.update(fields)
+    return client.post("/metrics", json=body, headers=headers)
+
+
+def test_cost_spike_alert_fires_and_scales(client, auth_headers):
+    # 2.5x the $1 ceiling -> warning.
+    warn = _ingest_llm(client, auth_headers, "cost-warn", model="gpt-4o", cost_usd=2.5)
+    rules = {a["rule"]: a for a in warn.json()["triggered_alerts"]}
+    assert "cost_spike" in rules
+    assert rules["cost_spike"]["severity"] == "warning"
+    # >=3x the ceiling -> critical.
+    crit = _ingest_llm(client, auth_headers, "cost-crit", cost_usd=5.0)
+    crit_rules = {a["rule"]: a for a in crit.json()["triggered_alerts"]}
+    assert crit_rules["cost_spike"]["severity"] == "critical"
+
+
+def test_token_spike_alert(client, auth_headers):
+    resp = _ingest_llm(
+        client, auth_headers, "tok-wl", input_tokens=120_000, output_tokens=0
+    )
+    rules = {a["rule"] for a in resp.json()["triggered_alerts"]}
+    assert "token_spike" in rules
+
+
+def test_rate_limit_surge_alert(client, auth_headers):
+    # Needs >= rate_limit_min_samples (5) and >= 20% rate-limited.
+    last = None
+    for _ in range(5):
+        last = _ingest_llm(
+            client, auth_headers, "rl-wl", status="error", error_type="rate_limit"
+        )
+    rules = {a["rule"] for a in last.json()["triggered_alerts"]}
+    assert "rate_limit_surge" in rules
+
+
+def test_llm_rules_dormant_for_http_workloads(client, auth_headers):
+    """A plain HTTP-style sample (no LLM fields) trips no LLM-tuned rule."""
+    resp = _ingest(client, auth_headers, "http-wl", latency=50)
+    rules = {a["rule"] for a in resp.json()["triggered_alerts"]}
+    assert rules.isdisjoint({"cost_spike", "token_spike", "rate_limit_surge"})

@@ -48,7 +48,9 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       workload) plus an account-wide spend breakdown by model and workload
       (`GET /metrics/cost`); the timeseries endpoint now also returns per-bucket
       tokens + cost
-- [ ] LLM-tuned alerts: cost spikes, rate-limit surges, token anomalies
+- [x] LLM-tuned alerts: `cost_spike` (per-call $ ceiling), `token_spike` (per-call
+      token ceiling), `rate_limit_surge` (clustered 429s). Threshold-based and
+      dormant for HTTP workloads; per-workload statistical baselines are next
 - [ ] Pluggable summarizer incl. local models (Ollama) so the AI feature is $0
 - [ ] Public read-only status page
 
