@@ -35,8 +35,9 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 
 ## LLM-observability features (the niche)
 
-- [ ] Enrich `MetricSample`: `model`, `provider`, `input_tokens`, `output_tokens`,
-      `cost_usd`, `operation`, error type (rate-limit / timeout / content-filter)
+- [x] Enrich `MetricSample`: `model`, `provider`, `input_tokens`, `output_tokens`,
+      `cost_usd`, `operation`, `error_type` (migration 0003) — all nullable, so
+      HTTP probes and the existing contract are unaffected
 - [ ] Cost tracking: per-model pricing table → spend over time, per model/workload
 - [ ] A Python SDK: wrap an LLM client to auto-record latency/tokens/cost/errors
       (`client = track(anthropic.Anthropic(), workload="support-bot")`)

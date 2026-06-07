@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -35,7 +35,17 @@ class MetricSample(Base):
     )
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)  # "ok" | "error"
-    tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)  # legacy total
+
+    # LLM-workload fields (all nullable; HTTP probes leave them empty).
+    model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    operation: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # e.g. "rate_limit" | "timeout" | "content_filter"
+    error_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     workload: Mapped["Workload"] = relationship(back_populates="samples")
 

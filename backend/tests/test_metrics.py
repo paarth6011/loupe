@@ -16,6 +16,30 @@ def test_ingest_creates_sample_and_workload(client, auth_headers):
     assert body["triggered_alerts"] == []
 
 
+def test_ingest_stores_llm_fields(client, auth_headers):
+    """An LLM-workload sample round-trips model/provider/tokens/cost."""
+    resp = _post_metric(
+        client,
+        auth_headers,
+        workload="gpt-4o-chat",
+        latency_ms=420,
+        model="gpt-4o",
+        provider="openai",
+        input_tokens=350,
+        output_tokens=120,
+        cost_usd=0.0021,
+        operation="chat",
+    )
+    assert resp.status_code == 201
+    s = resp.json()["sample"]
+    assert s["model"] == "gpt-4o"
+    assert s["provider"] == "openai"
+    assert s["input_tokens"] == 350
+    assert s["output_tokens"] == 120
+    assert s["cost_usd"] == 0.0021
+    assert s["operation"] == "chat"
+
+
 def test_high_latency_triggers_alert(client, auth_headers):
     resp = _post_metric(client, auth_headers, latency_ms=5000)
     assert resp.status_code == 201

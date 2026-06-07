@@ -63,6 +63,13 @@ def ingest_metric(
         latency_ms=body.latency_ms,
         status=body.status,
         tokens=body.tokens,
+        model=body.model,
+        provider=body.provider,
+        input_tokens=body.input_tokens,
+        output_tokens=body.output_tokens,
+        cost_usd=body.cost_usd,
+        operation=body.operation,
+        error_type=body.error_type,
     )
     if body.ts is not None:
         sample.ts = body.ts
