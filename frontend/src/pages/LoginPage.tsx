@@ -24,8 +24,8 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={submit}>
-        <h1>☁️ Cloud Ops</h1>
-        <p className="muted">Sign in to the operations dashboard</p>
+        <h1>🔎 Loupe</h1>
+        <p className="muted">Sign in to your observability dashboard</p>
         <label>
           Username
           <input

@@ -115,7 +115,7 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">☁️ Cloud Ops Dashboard</div>
+        <div className="brand">🔎 Loupe</div>
         <div className="spacer" />
         <select
           aria-label="workload"

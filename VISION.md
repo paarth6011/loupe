@@ -1,4 +1,6 @@
-# Vision — what this project becomes when it's done
+# Vision — what Loupe becomes when it's done
+
+> **Loupe** — *a clear look at what your LLM calls really cost.*
 
 > This describes the **target end-state**, not today's code. For what works right
 > now, see **[README.md](README.md)**; for the steps to get here, see
@@ -36,7 +38,7 @@ latency, input/output tokens, computed cost, status, model, and provider — the
 ships it to your dashboard. No vendor SDK, no inference added.
 
 ```python
-from cloudops import track
+from loupe import track
 client = track(anthropic.Anthropic(), workload="support-bot")
 # use `client` exactly as before — calls are now observed
 ```

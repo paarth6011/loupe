@@ -1,8 +1,8 @@
-# Roadmap
+# Loupe — Roadmap
 
 ## Vision
 
-**Open-source observability for LLM apps.** Drop a small SDK around your AI calls
+**Loupe: open-source observability for LLM apps.** Drop a small SDK around your AI calls
 and see latency, **token usage, and cost** per model/provider over time, with
 threshold + anomaly alerts and plain-English incident summaries.
 

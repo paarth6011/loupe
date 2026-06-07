@@ -23,7 +23,7 @@ if _insecure:
         message,
     )
 
-app = FastAPI(title="Cloud Ops Dashboard API", version="0.1.0")
+app = FastAPI(title="Loupe API", version="0.1.0")
 
 # Allowed origins come from config (localhost in dev; the frontend URL in prod).
 _origins = [o.strip() for o in _settings.cors_origins.split(",") if o.strip()]

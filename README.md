@@ -1,8 +1,17 @@
-# AI-Powered Cloud Operations Dashboard
+# 🔎 Loupe
 
-A full-stack dashboard for monitoring AI/cloud workloads: ingest latency / status /
-token metrics, evaluate threshold alerts on the fly, and visualize health in a live
-React dashboard. Everything runs locally via Docker Compose.
+**Open-source observability for LLM apps** — track the latency, tokens, and cost
+of your AI calls, with explainable alerts and plain-English incident summaries.
+Self-hosted, runs for $0, no API key required.
+
+A loupe is the magnifier you use to inspect fine detail — this one shows you what
+every LLM call really costs.
+
+> **Status:** the core monitoring pipeline (ingest → aggregate → alert →
+> summarize → visualize) works today on real data, as described below. The
+> LLM-specific cost/token tracking and the instrumentation SDK are in progress —
+> see **[VISION.md](VISION.md)** for the finished picture and
+> **[ROADMAP.md](ROADMAP.md)** for the path.
 
 ## Quickstart
 
