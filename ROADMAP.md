@@ -28,7 +28,7 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] Refuse to boot in production with default credentials (`admin`/`admin`,
       `change-me` JWT secret) — enforced via `ENVIRONMENT=production`
 - [ ] Published, versioned container images (GHCR) + tagged releases
-- [ ] Lint/format in CI (ruff, prettier)
+- [x] Lint/format in CI (ruff, prettier)
 - [ ] Configurable monitors/thresholds via the UI/API (not just env vars)
 - [ ] Notifications (Slack / Discord / email / webhook) — an alert nobody sees is useless
 

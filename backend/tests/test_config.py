@@ -6,9 +6,7 @@ from app.config import (
 
 
 def test_insecure_defaults_flagged():
-    s = Settings(
-        jwt_secret=INSECURE_JWT_SECRET, admin_password=INSECURE_ADMIN_PASSWORD
-    )
+    s = Settings(jwt_secret=INSECURE_JWT_SECRET, admin_password=INSECURE_ADMIN_PASSWORD)
     assert len(s.insecure_defaults()) == 2
 
 

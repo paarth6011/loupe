@@ -22,5 +22,7 @@ export function getTimeseries(
     window,
     bucket,
   });
-  return apiFetch<MetricsTimeseries>(`/metrics/timeseries?${params.toString()}`);
+  return apiFetch<MetricsTimeseries>(
+    `/metrics/timeseries?${params.toString()}`,
+  );
 }

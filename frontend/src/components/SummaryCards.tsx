@@ -1,6 +1,14 @@
 import type { MetricsSummary } from "../types";
 
-function Card({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Card({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
   return (
     <div className="card">
       <div className="card-label">{label}</div>

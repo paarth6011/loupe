@@ -13,7 +13,9 @@ describe("apiFetch", () => {
     setToken("tok123");
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     await apiFetch("/workloads");

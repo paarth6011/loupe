@@ -20,7 +20,10 @@ export default function ErrorRateChart({ data }: { data: ErrorPoint[] }) {
     <div className="panel">
       <h3>Error rate over time</h3>
       <ResponsiveContainer width="100%" height={200}>
-        <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
+        <AreaChart
+          data={data}
+          margin={{ top: 8, right: 16, bottom: 0, left: -8 }}
+        >
           <defs>
             <linearGradient id="errFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#f87171" stopOpacity={0.5} />
@@ -28,7 +31,12 @@ export default function ErrorRateChart({ data }: { data: ErrorPoint[] }) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#27324a" />
-          <XAxis dataKey="time" stroke="#7c8aa5" fontSize={12} minTickGap={32} />
+          <XAxis
+            dataKey="time"
+            stroke="#7c8aa5"
+            fontSize={12}
+            minTickGap={32}
+          />
           <YAxis stroke="#7c8aa5" fontSize={12} unit="%" domain={[0, "auto"]} />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
           <Area

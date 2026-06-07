@@ -6,11 +6,11 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app import models as _models  # noqa: F401  (register tables on Base.metadata)
 from app.cache import InMemoryCache, get_cache
 from app.database import Base, get_db, get_session_factory
 from app.main import app
 from app.summarizer import AlertContext, get_summarizer
-from app import models as _models  # noqa: F401  (register tables on Base.metadata)
 
 
 class FakeSummarizer:
@@ -22,7 +22,7 @@ class FakeSummarizer:
 
 @pytest.fixture
 def db_engine() -> Iterator[Engine]:
-    """One in-memory SQLite engine per test (shared by request + background sessions)."""
+    """In-memory SQLite engine per test (shared by request + background sessions)."""
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -67,8 +67,6 @@ def client(db_engine: Engine, db_session: Session) -> Iterator[TestClient]:
 
 @pytest.fixture
 def auth_headers(client: TestClient) -> dict[str, str]:
-    resp = client.post(
-        "/auth/login", json={"username": "admin", "password": "admin"}
-    )
+    resp = client.post("/auth/login", json={"username": "admin", "password": "admin"})
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

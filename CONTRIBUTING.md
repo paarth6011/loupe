@@ -29,6 +29,18 @@ cd frontend && npm ci && npm test && npm run build
 
 CI runs the same checks on every pull request — please make sure they pass.
 
+## Linting & formatting
+
+```bash
+# Backend (ruff)
+cd backend && ruff check app tests && ruff format app tests
+# Frontend (prettier)
+cd frontend && npm run format
+```
+
+CI fails on lint or formatting issues (`ruff check`, `ruff format --check`,
+`npm run format:check`), so run these before pushing.
+
 ## Conventions
 
 - **Backend:** Python 3.12, type hints throughout; pydantic schemas kept separate

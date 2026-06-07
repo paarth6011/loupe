@@ -22,9 +22,17 @@ export default function LatencyChart({ data }: { data: LatencyPoint[] }) {
     <div className="panel">
       <h3>Latency over time (p50 / p95)</h3>
       <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 8, right: 16, bottom: 0, left: -8 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#27324a" />
-          <XAxis dataKey="time" stroke="#7c8aa5" fontSize={12} minTickGap={32} />
+          <XAxis
+            dataKey="time"
+            stroke="#7c8aa5"
+            fontSize={12}
+            minTickGap={32}
+          />
           <YAxis stroke="#7c8aa5" fontSize={12} unit="ms" />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
           <Legend />

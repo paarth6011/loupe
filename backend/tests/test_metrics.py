@@ -59,9 +59,7 @@ def test_high_latency_alert_auto_resolves(client, auth_headers):
         last = None
         for _ in range(3):  # push the spike out of the size-3 window
             last = _post_metric(client, auth_headers, latency_ms=50)
-        assert any(
-            a["rule"] == "high_latency" for a in last.json()["resolved_alerts"]
-        )
+        assert any(a["rule"] == "high_latency" for a in last.json()["resolved_alerts"])
 
         resolved = client.get("/alerts?resolved=true", headers=auth_headers).json()
         assert any(a["rule"] == "high_latency" for a in resolved)

@@ -156,8 +156,8 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
       </main>
 
       <footer className="foot">
-        {selected ? `Monitoring "${selected.name}"` : "No workloads yet"} · polling
-        every {POLL_MS / 1000}s
+        {selected ? `Monitoring "${selected.name}"` : "No workloads yet"} ·
+        polling every {POLL_MS / 1000}s
       </footer>
     </div>
   );

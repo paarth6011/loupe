@@ -68,17 +68,14 @@ def evaluate_thresholds(
     # the threshold; resolves once the breach ages out of the window.
     max_latency = max((s.latency_ms for s in recent), default=0)
     latency_severity = (
-        "critical"
-        if max_latency >= 3 * settings.latency_threshold_ms
-        else "warning"
+        "critical" if max_latency >= 3 * settings.latency_threshold_ms else "warning"
     )
     _reconcile(
         db,
         sample.workload_id,
         "high_latency",
         max_latency > settings.latency_threshold_ms,
-        f"latency {max_latency}ms exceeded threshold "
-        f"{settings.latency_threshold_ms}ms",
+        f"latency {max_latency}ms exceeded threshold {settings.latency_threshold_ms}ms",
         latency_severity,
         opened,
         resolved,

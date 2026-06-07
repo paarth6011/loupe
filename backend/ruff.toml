@@ -1,0 +1,6 @@
+line-length = 88
+target-version = "py312"
+
+[lint]
+# pycodestyle errors, pyflakes, import sorting
+select = ["E", "F", "I"]

@@ -6,7 +6,8 @@ export function listAlerts(params?: {
   resolved?: boolean;
 }): Promise<Alert[]> {
   const query = new URLSearchParams();
-  if (params?.workloadId != null) query.set("workload_id", String(params.workloadId));
+  if (params?.workloadId != null)
+    query.set("workload_id", String(params.workloadId));
   if (params?.resolved != null) query.set("resolved", String(params.resolved));
   const qs = query.toString();
   return apiFetch<Alert[]>(`/alerts${qs ? `?${qs}` : ""}`);
