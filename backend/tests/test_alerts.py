@@ -99,3 +99,36 @@ def test_llm_rules_dormant_for_http_workloads(client, auth_headers):
     resp = _ingest(client, auth_headers, "http-wl", latency=50)
     rules = {a["rule"] for a in resp.json()["triggered_alerts"]}
     assert rules.isdisjoint({"cost_spike", "token_spike", "rate_limit_surge"})
+
+
+# --- Statistical anomaly detection ------------------------------------------
+
+
+def test_threshold_alerts_are_tagged_threshold(client, auth_headers):
+    resp = _ingest(client, auth_headers, "det-wl", latency=5000)
+    assert resp.json()["triggered_alerts"][0]["detector"] == "threshold"
+
+
+def test_latency_anomaly_fires_via_zscore(client, auth_headers):
+    wl = "anom-wl"
+    # A stable baseline well under the 1000ms absolute threshold.
+    for i in range(30):
+        _ingest(client, auth_headers, wl, latency=100 + (i % 7))
+    # A sustained jump that is *still under* the absolute threshold...
+    for _ in range(5):
+        _ingest(client, auth_headers, wl, latency=600)
+
+    by_rule = {a["rule"]: a for a in client.get("/alerts", headers=auth_headers).json()}
+    # ...so only the statistical detector can catch it, not high_latency.
+    assert "latency_anomaly" in by_rule
+    assert by_rule["latency_anomaly"]["detector"] == "zscore"
+    assert by_rule["latency_anomaly"]["resolved_at"] is None
+    assert "high_latency" not in by_rule
+
+
+def test_no_anomaly_for_stable_workload(client, auth_headers):
+    wl = "stable-wl"
+    for i in range(35):
+        _ingest(client, auth_headers, wl, latency=100 + (i % 5))
+    rules = {a["rule"] for a in client.get("/alerts", headers=auth_headers).json()}
+    assert "latency_anomaly" not in rules

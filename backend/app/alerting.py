@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.detection import zscore_anomaly
 from app.models import Alert, MetricSample
 
 
@@ -26,6 +27,7 @@ def _reconcile(
     severity: str,
     opened: list[Alert],
     resolved: list[Alert],
+    detector: str = "threshold",
 ) -> None:
     """Open an alert when a rule starts firing; resolve it when it recovers.
 
@@ -35,7 +37,11 @@ def _reconcile(
     existing = _open_alert(db, workload_id, rule)
     if firing and existing is None:
         alert = Alert(
-            workload_id=workload_id, rule=rule, message=message, severity=severity
+            workload_id=workload_id,
+            rule=rule,
+            message=message,
+            severity=severity,
+            detector=detector,
         )
         db.add(alert)
         db.flush()
@@ -185,6 +191,79 @@ def evaluate_thresholds(
         rl_severity,
         opened,
         resolved,
+    )
+
+    # --- Statistical anomaly detection (zscore) -----------------------------
+    # Learn each workload's own baseline and flag when recent calls deviate from
+    # it — catches "slow/expensive for THIS workload", which fixed thresholds
+    # miss. Needs more history than the threshold rules, so it fetches its own.
+    history = db.scalars(
+        select(MetricSample)
+        .where(MetricSample.workload_id == sample.workload_id)
+        .order_by(MetricSample.ts.desc(), MetricSample.id.desc())
+        .limit(settings.anomaly_recent_samples + settings.anomaly_baseline_window)
+    ).all()
+
+    def _severity_for(z: float) -> str:
+        return "critical" if z >= 1.5 * settings.anomaly_z_threshold else "warning"
+
+    # Rule: latency_anomaly — recent latency abnormally high vs the baseline.
+    lat = zscore_anomaly(
+        [float(s.latency_ms) for s in history],
+        recent_samples=settings.anomaly_recent_samples,
+        min_baseline=settings.anomaly_min_baseline,
+        z_threshold=settings.anomaly_z_threshold,
+    )
+    lat_message = ""
+    lat_severity = "warning"
+    if lat is not None:
+        lat_severity = _severity_for(lat.z)
+        lat_message = (
+            f"latency averaged {lat.recent_mean:.0f}ms over the last "
+            f"{settings.anomaly_recent_samples} calls — {lat.z:.1f}σ above this "
+            f"workload's baseline {lat.baseline_mean:.0f}ms "
+            f"± {lat.baseline_std:.0f}ms ({lat.baseline_n} samples)"
+        )
+    _reconcile(
+        db,
+        sample.workload_id,
+        "latency_anomaly",
+        lat is not None and lat.firing,
+        lat_message,
+        lat_severity,
+        opened,
+        resolved,
+        detector="zscore",
+    )
+
+    # Rule: cost_anomaly — recent per-call cost abnormally high vs the baseline.
+    # Dormant for HTTP workloads (no cost samples -> detector abstains).
+    cost = zscore_anomaly(
+        [float(s.cost_usd) for s in history if s.cost_usd is not None],
+        recent_samples=settings.anomaly_recent_samples,
+        min_baseline=settings.anomaly_min_baseline,
+        z_threshold=settings.anomaly_z_threshold,
+    )
+    cost_message = ""
+    cost_severity = "warning"
+    if cost is not None:
+        cost_severity = _severity_for(cost.z)
+        cost_message = (
+            f"cost averaged ${cost.recent_mean:.4f}/call over the last "
+            f"{settings.anomaly_recent_samples} calls — {cost.z:.1f}σ above this "
+            f"workload's baseline ${cost.baseline_mean:.4f} "
+            f"± ${cost.baseline_std:.4f} ({cost.baseline_n} samples)"
+        )
+    _reconcile(
+        db,
+        sample.workload_id,
+        "cost_anomaly",
+        cost is not None and cost.firing,
+        cost_message,
+        cost_severity,
+        opened,
+        resolved,
+        detector="zscore",
     )
 
     return opened, resolved

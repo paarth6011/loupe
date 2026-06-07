@@ -62,6 +62,10 @@ class Alert(Base):
     severity: Mapped[str] = mapped_column(
         String(16), nullable=False, default="warning"
     )  # "info" | "warning" | "critical"
+    # Which detector raised this alert, for explainability.
+    detector: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="threshold"
+    )  # "threshold" | "zscore"
     # Plain-English incident summary, populated asynchronously by the LLM.
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     triggered_at: Mapped[datetime] = mapped_column(

@@ -22,6 +22,14 @@ export default function AlertsPanel({
         <span className="alert-rule">
           <span className={`sev sev-${a.severity}`}>{a.severity}</span>
           {a.rule}
+          {a.detector && a.detector !== "threshold" ? (
+            <span
+              className="detector-tag"
+              title="raised by statistical detection"
+            >
+              {a.detector}
+            </span>
+          ) : null}
         </span>
         <span className="alert-time">
           {new Date(a.triggered_at).toLocaleTimeString()}

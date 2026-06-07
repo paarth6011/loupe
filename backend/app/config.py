@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     rate_limit_threshold: float = 0.2  # fraction of recent calls that are 429s
     rate_limit_min_samples: int = 5  # need at least this many before evaluating
 
+    # Statistical anomaly detection (rolling-window z-score, per workload+metric).
+    # Learns each workload's own baseline instead of using a fixed threshold.
+    anomaly_recent_samples: int = 5  # newest calls compared against the baseline
+    anomaly_baseline_window: int = 100  # max older calls used to learn the baseline
+    anomaly_min_baseline: int = 20  # need at least this many baseline calls to judge
+    anomaly_z_threshold: float = 3.0  # std-devs above baseline before firing
+
     # Redis cache (Phase 2)
     redis_url: str = "redis://redis:6379/0"
     summary_cache_ttl_seconds: int = 15

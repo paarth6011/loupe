@@ -50,7 +50,12 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       tokens + cost
 - [x] LLM-tuned alerts: `cost_spike` (per-call $ ceiling), `token_spike` (per-call
       token ceiling), `rate_limit_surge` (clustered 429s). Threshold-based and
-      dormant for HTTP workloads; per-workload statistical baselines are next
+      dormant for HTTP workloads
+- [x] Statistical anomaly detection: per-workload rolling-window **z-score**
+      baselines for latency and cost (`latency_anomaly`, `cost_anomaly`). Catches
+      "slow/expensive for *this* workload" that fixed thresholds miss, and is
+      fully explainable — every alert records its `detector` and the numbers
+      (recent mean, baseline mean ± σ, sample count). No black-box models
 - [ ] Pluggable summarizer incl. local models (Ollama) so the AI feature is $0
 - [ ] Public read-only status page
 

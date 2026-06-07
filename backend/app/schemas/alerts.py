@@ -11,6 +11,7 @@ class AlertOut(BaseModel):
     rule: str
     message: str
     severity: str
+    detector: str
     summary: str | None
     triggered_at: datetime
     resolved_at: datetime | None

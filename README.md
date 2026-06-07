@@ -84,6 +84,21 @@ ingest and tunable via env vars:
 These read the LLM sample fields and stay dormant for HTTP-only workloads, where
 those fields are null.
 
+**Statistical anomaly detection** complements the fixed thresholds: a rolling
+per-workload **z-score** baseline catches latency/cost that is abnormal *for that
+workload* even when it's under the absolute ceiling (e.g. a service usually at
+50 ms jumping to 300 ms). It's explainable by design — every anomaly alert is
+tagged with its `detector` (`zscore`) and spells out the numbers: recent mean,
+the learned baseline mean ± σ, and the sample count. No black-box models.
+
+| Rule | Fires when | Detector |
+|---|---|---|
+| `latency_anomaly` | recent latency is ≥ N σ above the workload's baseline | `zscore` |
+| `cost_anomaly` | recent per-call cost is ≥ N σ above the workload's baseline | `zscore` |
+
+Tunable via `ANOMALY_Z_THRESHOLD` (default `3.0`), `ANOMALY_RECENT_SAMPLES`,
+`ANOMALY_MIN_BASELINE`, and `ANOMALY_BASELINE_WINDOW`.
+
 **Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
 webhook to get pinged when an alert fires or resolves. The payload includes
 `text` (Slack), `content` (Discord), and structured `alert` fields; empty

@@ -298,6 +298,19 @@ select {
   font-weight: 600;
   font-size: 13px;
 }
+.detector-tag {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(34, 211, 238, 0.16);
+  color: #67e8f9;
+  vertical-align: middle;
+}
 .alert-time {
   color: var(--muted);
   font-size: 12px;

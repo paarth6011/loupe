@@ -10,6 +10,7 @@ export interface Alert {
   rule: string;
   message: string;
   severity: string;
+  detector: string;
   summary: string | null;
   triggered_at: string;
   resolved_at: string | null;
