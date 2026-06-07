@@ -25,6 +25,17 @@ Then open **http://localhost:5173** and sign in with **admin / admin**.
 The prober immediately starts measuring real HTTP endpoints (latency + up/down),
 so the charts and alerts populate within seconds.
 
+## Instrument your LLM calls (SDK)
+
+The [`loupe` Python SDK](sdk/) wraps your Anthropic/OpenAI client so each call's
+latency, tokens, cost, and errors flow into Loupe — in two lines:
+
+```python
+from loupe import track
+client = track(anthropic.Anthropic(), workload="support-bot")
+# use `client` exactly as before — calls are now observed
+```
+
 ## Services & ports
 
 | Service     | URL / port              | What it is                                 |
