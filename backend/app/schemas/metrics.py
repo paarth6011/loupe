@@ -55,6 +55,36 @@ class MetricsSummary(BaseModel):
     error_rate: float
     latency_p50_ms: float | None
     latency_p95_ms: float | None
+    # LLM cost/token rollups (default 0 keeps older cached payloads valid).
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_cost_usd: float = 0.0
+
+
+class CostByModel(BaseModel):
+    model: str
+    provider: str | None
+    requests: int
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float
+
+
+class CostByWorkload(BaseModel):
+    workload_id: int
+    workload: str
+    requests: int
+    cost_usd: float
+
+
+class CostSummary(BaseModel):
+    window: str
+    total_requests: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_cost_usd: float
+    by_model: list[CostByModel]
+    by_workload: list[CostByWorkload]
 
 
 class TimeseriesPoint(BaseModel):

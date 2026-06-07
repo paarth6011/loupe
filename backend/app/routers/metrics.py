@@ -13,8 +13,12 @@ from app.database import get_db, get_session_factory
 from app.deps import get_current_user
 from app.models import MetricSample, Workload
 from app.notifications import AlertEvent, Notifier, get_notifier
+from app.pricing import compute_cost
 from app.schemas.auth import CurrentUser
 from app.schemas.metrics import (
+    CostByModel,
+    CostByWorkload,
+    CostSummary,
     MetricIngest,
     MetricIngestResponse,
     MetricsSummary,
@@ -58,6 +62,11 @@ def ingest_metric(
 ) -> MetricIngestResponse:
     workload = _get_or_create_workload(db, body.workload)
 
+    # Use the client-supplied cost, else estimate it from model + token counts.
+    cost_usd = body.cost_usd
+    if cost_usd is None:
+        cost_usd = compute_cost(body.model, body.input_tokens, body.output_tokens)
+
     sample = MetricSample(
         workload_id=workload.id,
         latency_ms=body.latency_ms,
@@ -67,7 +76,7 @@ def ingest_metric(
         provider=body.provider,
         input_tokens=body.input_tokens,
         output_tokens=body.output_tokens,
-        cost_usd=body.cost_usd,
+        cost_usd=cost_usd,
         operation=body.operation,
         error_type=body.error_type,
     )
@@ -177,6 +186,9 @@ def metrics_summary(
         error_rate=round(errors / count, 4) if count else 0.0,
         latency_p50_ms=percentile(latencies, 50),
         latency_p95_ms=percentile(latencies, 95),
+        total_input_tokens=sum(s.input_tokens or 0 for s in in_window),
+        total_output_tokens=sum(s.output_tokens or 0 for s in in_window),
+        total_cost_usd=round(sum(s.cost_usd or 0.0 for s in in_window), 6),
     )
     cache.set(cache_key, summary.model_dump_json(), settings.summary_cache_ttl_seconds)
     return summary
@@ -247,4 +259,83 @@ def metrics_timeseries(
 
     return MetricsTimeseries(
         workload_id=workload_id, window=window, bucket=bucket, points=points
+    )
+
+
+@router.get("/metrics/cost", response_model=CostSummary)
+def metrics_cost(
+    window: str = "24h",
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+) -> CostSummary:
+    """Account-wide spend over a window, broken down by model and by workload."""
+    try:
+        delta = parse_window(window)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+
+    since = datetime.now(timezone.utc) - delta
+    samples = db.scalars(select(MetricSample)).all()
+    in_window = [s for s in samples if as_utc(s.ts) >= since]
+    names = {w.id: w.name for w in db.scalars(select(Workload)).all()}
+
+    by_model: dict[tuple[str, str | None], dict] = {}
+    by_workload: dict[int, dict] = {}
+    total_in = total_out = 0
+    total_cost = 0.0
+
+    for s in in_window:
+        it, ot, cost = s.input_tokens or 0, s.output_tokens or 0, s.cost_usd or 0.0
+        total_in += it
+        total_out += ot
+        total_cost += cost
+
+        wl = by_workload.setdefault(s.workload_id, {"requests": 0, "cost": 0.0})
+        wl["requests"] += 1
+        wl["cost"] += cost
+
+        if s.model:
+            key = (s.model, s.provider)
+            md = by_model.setdefault(
+                key, {"requests": 0, "in": 0, "out": 0, "cost": 0.0}
+            )
+            md["requests"] += 1
+            md["in"] += it
+            md["out"] += ot
+            md["cost"] += cost
+
+    models = [
+        CostByModel(
+            model=m,
+            provider=p,
+            requests=v["requests"],
+            input_tokens=v["in"],
+            output_tokens=v["out"],
+            cost_usd=round(v["cost"], 6),
+        )
+        for (m, p), v in by_model.items()
+    ]
+    models.sort(key=lambda x: x.cost_usd, reverse=True)
+
+    workloads = [
+        CostByWorkload(
+            workload_id=wid,
+            workload=names.get(wid, f"#{wid}"),
+            requests=v["requests"],
+            cost_usd=round(v["cost"], 6),
+        )
+        for wid, v in by_workload.items()
+    ]
+    workloads.sort(key=lambda x: x.cost_usd, reverse=True)
+
+    return CostSummary(
+        window=window,
+        total_requests=len(in_window),
+        total_input_tokens=total_in,
+        total_output_tokens=total_out,
+        total_cost_usd=round(total_cost, 6),
+        by_model=models,
+        by_workload=workloads,
     )

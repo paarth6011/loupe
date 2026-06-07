@@ -38,7 +38,9 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] Enrich `MetricSample`: `model`, `provider`, `input_tokens`, `output_tokens`,
       `cost_usd`, `operation`, `error_type` (migration 0003) — all nullable, so
       HTTP probes and the existing contract are unaffected
-- [ ] Cost tracking: per-model pricing table → spend over time, per model/workload
+- [x] Cost tracking: per-model pricing table → auto-compute `cost_usd` on ingest;
+      cost/token rollups in `/metrics/summary`; `GET /metrics/cost` breakdown by
+      model + workload (spend-over-time charts come with the dashboard step)
 - [ ] A Python SDK: wrap an LLM client to auto-record latency/tokens/cost/errors
       (`client = track(anthropic.Anthropic(), workload="support-bot")`)
 - [ ] Dashboard panels for token throughput and cost-over-time; per-model breakdown
