@@ -73,6 +73,18 @@ export interface MetricsTimeseries {
   points: TimeseriesPoint[];
 }
 
+export interface Monitor {
+  rule: string;
+  label: string;
+  unit: string;
+  detector: string;
+  integer: boolean;
+  enabled: boolean;
+  threshold: number | null;
+  default_threshold: number;
+  effective_threshold: number;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

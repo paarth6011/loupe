@@ -1,6 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,6 +29,9 @@ class Workload(Base):
         back_populates="workload", cascade="all, delete-orphan"
     )
     alerts: Mapped[list["Alert"]] = relationship(
+        back_populates="workload", cascade="all, delete-orphan"
+    )
+    monitors: Mapped[list["Monitor"]] = relationship(
         back_populates="workload", cascade="all, delete-orphan"
     )
 
@@ -76,3 +89,31 @@ class Alert(Base):
     )
 
     workload: Mapped["Workload"] = relationship(back_populates="alerts")
+
+
+class Monitor(Base):
+    """A per-workload override for one alert rule.
+
+    At most one row per (workload, rule). ``threshold`` is null to keep the
+    global default; a non-null value overrides it. ``enabled`` false mutes the
+    rule for this workload (and resolves any of its open alerts on next ingest).
+    """
+
+    __tablename__ = "monitors"
+    __table_args__ = (UniqueConstraint("workload_id", "rule", name="uq_monitor_rule"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workload_id: Mapped[int] = mapped_column(
+        ForeignKey("workloads.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    rule: Mapped[str] = mapped_column(String(64), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    workload: Mapped["Workload"] = relationship(back_populates="monitors")

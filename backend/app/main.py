@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import alerts, auth, health, metrics, workloads
+from app.routers import alerts, auth, health, metrics, monitors, workloads
 
 _settings = get_settings()
 
@@ -40,3 +40,4 @@ app.include_router(auth.router)
 app.include_router(metrics.router)
 app.include_router(workloads.router)
 app.include_router(alerts.router)
+app.include_router(monitors.router)

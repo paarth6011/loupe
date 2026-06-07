@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { listAlerts } from "../api/alerts";
 import { ApiError } from "../api/client";
@@ -9,6 +9,7 @@ import CostBreakdown from "../components/CostBreakdown";
 import CostChart, { type CostPoint } from "../components/CostChart";
 import ErrorRateChart, { type ErrorPoint } from "../components/ErrorRateChart";
 import LatencyChart, { type LatencyPoint } from "../components/LatencyChart";
+import MonitorsPanel from "../components/MonitorsPanel";
 import SummaryCards from "../components/SummaryCards";
 import TokenChart, { type TokenPoint } from "../components/TokenChart";
 import type { Alert, CostSummary, MetricsSummary, Workload } from "../types";
@@ -44,14 +45,20 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   const [costSeries, setCostSeries] = useState<CostPoint[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showMonitors, setShowMonitors] = useState(false);
 
-  function handleError(e: unknown) {
-    if (e instanceof ApiError && e.status === 401) {
-      onLogout();
-      return;
-    }
-    setError(e instanceof Error ? e.message : "Request failed");
-  }
+  // Stable across renders so it can sit in child effect deps without causing
+  // a refetch on every poll (which would otherwise wipe in-progress edits).
+  const handleError = useCallback(
+    (e: unknown) => {
+      if (e instanceof ApiError && e.status === 401) {
+        onLogout();
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Request failed");
+    },
+    [onLogout],
+  );
 
   // Load workloads once and default the selection to the first one.
   useEffect(() => {
@@ -169,8 +176,24 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
             </option>
           ))}
         </select>
+        <button
+          className="secondary"
+          disabled={selectedId == null}
+          onClick={() => setShowMonitors(true)}
+        >
+          ⚙ Monitors
+        </button>
         <button onClick={onLogout}>Log out</button>
       </header>
+
+      {showMonitors && selected ? (
+        <MonitorsPanel
+          workloadId={selected.id}
+          workloadName={selected.name}
+          onClose={() => setShowMonitors(false)}
+          onError={handleError}
+        />
+      ) : null}
 
       {error ? <div className="error-banner">{error}</div> : null}
 

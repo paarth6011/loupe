@@ -29,7 +29,10 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       `change-me` JWT secret) — enforced via `ENVIRONMENT=production`
 - [ ] Published, versioned container images (GHCR) + tagged releases
 - [x] Lint/format in CI (ruff, prettier)
-- [ ] Configurable monitors/thresholds via the UI/API (not just env vars)
+- [x] Configurable monitors/thresholds via the UI/API (not just env vars):
+      per-workload enable/disable + threshold overrides for every rule
+      (`GET`/`PUT /workloads/{id}/monitors`), merged over the global defaults; a
+      settings modal in the dashboard. Env vars remain the defaults
 - [x] Notifications — webhook (Slack/Discord/generic) on alert fire & resolve
       (`NOTIFY_WEBHOOK_URL`); email/native channels later
 

@@ -59,6 +59,8 @@ automatically on first boot.
 - `GET  /metrics/timeseries?workload_id=&window=&bucket=` (auth) — bucketed latency/errors + tokens/cost
 - `GET  /metrics/cost?window=` (auth) — account-wide spend, broken down by model and workload
 - `GET  /alerts` (auth) — supports `?workload_id=` and `?resolved=` filters
+- `GET  /workloads/{id}/monitors` (auth) — every rule's effective config for a workload
+- `PUT  /workloads/{id}/monitors/{rule}` (auth) — enable/disable or override a rule's threshold
 
 ## Tests
 
@@ -98,6 +100,12 @@ the learned baseline mean ± σ, and the sample count. No black-box models.
 
 Tunable via `ANOMALY_Z_THRESHOLD` (default `3.0`), `ANOMALY_RECENT_SAMPLES`,
 `ANOMALY_MIN_BASELINE`, and `ANOMALY_BASELINE_WINDOW`.
+
+**Per-workload monitors:** the env vars above set the *global defaults*. Each
+workload can override any rule's threshold or disable it entirely — at runtime,
+no redeploy — via the **⚙ Monitors** modal in the dashboard or the
+`/workloads/{id}/monitors` API. Disabling a rule mutes it and clears its active
+alerts; an empty threshold falls back to the global default.
 
 **Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
 webhook to get pinged when an alert fires or resolves. The payload includes
