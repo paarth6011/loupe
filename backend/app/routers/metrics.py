@@ -12,6 +12,7 @@ from app.config import Settings, get_settings
 from app.database import get_db, get_session_factory
 from app.deps import get_current_user
 from app.models import MetricSample, Workload
+from app.notifications import AlertEvent, Notifier, get_notifier
 from app.schemas.auth import CurrentUser
 from app.schemas.metrics import (
     MetricIngest,
@@ -51,6 +52,7 @@ def ingest_metric(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     summarizer: Summarizer = Depends(get_summarizer),
+    notifier: Notifier = Depends(get_notifier),
     session_factory: sessionmaker = Depends(get_session_factory),
     _: CurrentUser = Depends(get_current_user),
 ) -> MetricIngestResponse:
@@ -68,13 +70,26 @@ def ingest_metric(
     db.flush()  # assign id + server-default ts and make it visible to threshold queries
 
     opened, resolved = evaluate_thresholds(db, sample, settings)
-    # Capture what the summary tasks need before commit expires the ORM objects.
+    # Capture what the background tasks need before commit expires the ORM objects.
     opened_info = [(a.id, a.rule, a.severity, a.message) for a in opened]
+    resolved_info = [(a.id, a.rule, a.severity, a.message) for a in resolved]
     workload_name = workload.name
     workload_id = workload.id
 
     db.commit()
     db.refresh(sample)
+
+    # Push alert notifications off the request path (open + resolve).
+    for alert_id, rule, severity, message in opened_info:
+        background_tasks.add_task(
+            notifier.notify,
+            AlertEvent("firing", alert_id, workload_name, rule, severity, message),
+        )
+    for alert_id, rule, severity, message in resolved_info:
+        background_tasks.add_task(
+            notifier.notify,
+            AlertEvent("resolved", alert_id, workload_name, rule, severity, message),
+        )
 
     # Generate LLM summaries off the request path; ingestion never blocks on it.
     if opened_info:

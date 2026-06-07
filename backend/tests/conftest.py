@@ -10,6 +10,7 @@ from app import models as _models  # noqa: F401  (register tables on Base.metada
 from app.cache import InMemoryCache, get_cache
 from app.database import Base, get_db, get_session_factory
 from app.main import app
+from app.notifications import AlertEvent, get_notifier
 from app.summarizer import AlertContext, get_summarizer
 
 
@@ -18,6 +19,16 @@ class FakeSummarizer:
 
     def summarize(self, ctx: AlertContext) -> str:
         return f"[summary] {ctx.workload_name}/{ctx.rule}"
+
+
+class CapturingNotifier:
+    """Records alert events instead of sending them (no real HTTP)."""
+
+    def __init__(self) -> None:
+        self.events: list[AlertEvent] = []
+
+    def notify(self, event: AlertEvent) -> None:
+        self.events.append(event)
 
 
 @pytest.fixture
@@ -44,9 +55,17 @@ def db_session(db_engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(db_engine: Engine, db_session: Session) -> Iterator[TestClient]:
-    """TestClient wired to the in-memory engine, an InMemoryCache, and a fake
-    summarizer; background tasks use a session factory on the same engine."""
+def notifier() -> CapturingNotifier:
+    return CapturingNotifier()
+
+
+@pytest.fixture
+def client(
+    db_engine: Engine, db_session: Session, notifier: CapturingNotifier
+) -> Iterator[TestClient]:
+    """TestClient wired to the in-memory engine, an InMemoryCache, a fake
+    summarizer, and a capturing notifier; background tasks use a session factory
+    on the same engine."""
     test_session_factory = sessionmaker(
         bind=db_engine, autoflush=False, autocommit=False
     )
@@ -60,6 +79,7 @@ def client(db_engine: Engine, db_session: Session) -> Iterator[TestClient]:
     app.dependency_overrides[get_cache] = lambda: cache
     app.dependency_overrides[get_session_factory] = lambda: test_session_factory
     app.dependency_overrides[get_summarizer] = lambda: fake_summarizer
+    app.dependency_overrides[get_notifier] = lambda: notifier
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

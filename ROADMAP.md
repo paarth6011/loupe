@@ -30,7 +30,8 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [ ] Published, versioned container images (GHCR) + tagged releases
 - [x] Lint/format in CI (ruff, prettier)
 - [ ] Configurable monitors/thresholds via the UI/API (not just env vars)
-- [ ] Notifications (Slack / Discord / email / webhook) — an alert nobody sees is useless
+- [x] Notifications — webhook (Slack/Discord/generic) on alert fire & resolve
+      (`NOTIFY_WEBHOOK_URL`); email/native channels later
 
 ## LLM-observability features (the niche)
 

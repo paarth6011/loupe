@@ -59,6 +59,11 @@ All config is via environment variables (see `.env.example`): database URL, JWT
 settings, the single admin user, and the alerting thresholds
 (`LATENCY_THRESHOLD_MS`, `ERROR_RATE_THRESHOLD`, …).
 
+**Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
+webhook to get pinged when an alert fires or resolves. The payload includes
+`text` (Slack), `content` (Discord), and structured `alert` fields; empty
+disables notifications.
+
 ## Costs & API keys
 
 **This project runs fully for $0 with no API key.** Keys are optional, used in

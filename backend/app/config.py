@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     summary_model: str = "claude-haiku-4-5"
 
+    # Alert notifications. Empty -> notifications disabled (NullNotifier).
+    # Works with Slack / Discord / generic webhook receivers.
+    notify_webhook_url: str = ""
+
     def is_production(self) -> bool:
         return self.environment.strip().lower() in {"prod", "production"}
 
