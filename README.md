@@ -23,13 +23,20 @@ every LLM call really costs.
 
 ```bash
 cp .env.example .env        # optional — sensible defaults are baked in
-docker compose up --build   # brings up db + backend + frontend + prober
+docker compose up --build   # brings up db + backend + frontend (empty instance)
 ```
 
-Then open **http://localhost:5173** and sign in with **admin / admin**.
+Then open **http://localhost:5173** and sign in with **admin / admin**. The
+instance starts empty — instrument an app with the [SDK](#instrument-your-llm-calls-sdk)
+to fill it with your own data.
 
-The prober immediately starts measuring real HTTP endpoints (latency + up/down),
-so the charts and alerts populate within seconds.
+**Want a live demo first?** Start the optional prober, which measures real public
+HTTP endpoints (latency + up/down) so the charts and alerts populate within
+seconds:
+
+```bash
+docker compose --profile demo up -d   # adds the prober (canned demo data)
+```
 
 ## Instrument your LLM calls (SDK)
 
