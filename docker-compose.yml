@@ -77,8 +77,12 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Optional demo data generator. Opt-in only: a plain `docker compose up` does
+  # NOT start it, so a fresh instance comes up empty. Run the canned demo with:
+  #   docker compose --profile demo up -d
   prober:
     build: ./prober
+    profiles: ["demo"]
     environment:
       API_URL: http://backend:8000
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
