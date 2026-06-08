@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { listAlerts } from "../api/alerts";
 import { ApiError } from "../api/client";
+import { openEventStream } from "../api/events";
 import { getCost, getSummary, getTimeseries } from "../api/metrics";
 import { listWorkloads } from "../api/workloads";
 import AlertsPanel from "../components/AlertsPanel";
@@ -25,7 +26,9 @@ const BUCKET_FOR: Record<string, string> = {
   "24h": "30m",
   "7d": "6h",
 };
-const POLL_MS = 3000;
+// Live updates arrive over SSE; this slow interval is only a safety net in case
+// the stream stalls (e.g. a flaky proxy that swallows the connection silently).
+const FALLBACK_MS = 30000;
 
 function formatBucket(iso: string): string {
   return new Date(iso).toLocaleTimeString([], {
@@ -134,13 +137,19 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
       }
     }
 
+    // Initial load, then refetch whenever the server says data changed. A slow
+    // fallback interval covers the rare case where the stream stalls silently.
     tick(selectedId);
-    const id = setInterval(() => tick(selectedId), POLL_MS);
+    const stop = openEventStream(() => {
+      if (active) tick(selectedId);
+    }, onLogout);
+    const fallback = setInterval(() => tick(selectedId), FALLBACK_MS);
     return () => {
       active = false;
-      clearInterval(id);
+      stop();
+      clearInterval(fallback);
     };
-  }, [selectedId, timeWindow]);
+  }, [selectedId, timeWindow, onLogout]);
 
   const selected = workloads.find((w) => w.id === selectedId) ?? null;
   // Only show token/cost charts for workloads that actually report LLM usage,
@@ -228,8 +237,8 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
       </main>
 
       <footer className="foot">
-        {selected ? `Monitoring "${selected.name}"` : "No workloads yet"} ·
-        polling every {POLL_MS / 1000}s
+        {selected ? `Monitoring "${selected.name}"` : "No workloads yet"} · live
+        updates (SSE)
       </footer>
     </div>
   );

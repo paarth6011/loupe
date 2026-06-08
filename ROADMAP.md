@@ -74,7 +74,11 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] Data retention: `RETENTION_DAYS` prunes old samples + stale resolved
       alerts via a background sweep and an admin endpoint (`POST /admin/prune`).
       Continuous-aggregate downsampling (TimescaleDB) still future
-- [ ] Live updates via SSE/WebSocket instead of polling
+- [x] Live updates via Server-Sent Events instead of polling: the dashboard
+      opens a single `GET /events` stream and refetches only when the server
+      signals a change (newest sample/alert id + open-alert count), with a slow
+      fallback interval as a safety net. Auth via a query-param JWT (EventSource
+      can't set headers); the connection self-recycles and the browser reconnects
 - [ ] Keep the core cloud-agnostic; treat GCP/Terraform as one deploy example
 
 ## Explicitly out of scope (for now)

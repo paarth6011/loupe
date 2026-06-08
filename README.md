@@ -65,6 +65,7 @@ automatically on first boot.
 - `GET  /alerts` (auth) — supports `?workload_id=` and `?resolved=` filters
 - `GET  /workloads/{id}/monitors` (auth) — every rule's effective config for a workload
 - `PUT  /workloads/{id}/monitors/{rule}` (auth) — enable/disable or override a rule's threshold
+- `GET  /events?token=<jwt>` — Server-Sent Events stream; pushes a `changed` event when new data lands so the dashboard refetches without fixed-interval polling
 
 ## Tests
 
@@ -116,6 +117,13 @@ metric samples and stale resolved alerts older than that many days. A background
 sweep runs every `RETENTION_SWEEP_HOURS`; `POST /admin/prune?days=N` (admin)
 triggers it on demand. Aggregation (summary, cost, timeseries) runs in SQL, so
 these endpoints scale with the table rather than loading it into the app.
+
+**Live updates:** the dashboard subscribes to a single `GET /events`
+Server-Sent Events stream and refetches only when the server signals new data
+(it watches the newest sample/alert id and the open-alert count), instead of
+blindly polling. The JWT is passed as a `token` query param since `EventSource`
+can't set headers; each connection self-recycles every few minutes and the
+browser reconnects, with a slow client-side interval as a safety net.
 
 **Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
 webhook to get pinged when an alert fires or resolves. The payload includes
