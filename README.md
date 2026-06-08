@@ -13,6 +13,12 @@ every LLM call really costs.
 > see **[VISION.md](VISION.md)** for the finished picture and
 > **[ROADMAP.md](ROADMAP.md)** for the path.
 
+## Screenshots
+
+| Dashboard (latency · tokens · cost · alerts) | Public status page |
+|---|---|
+| ![Loupe dashboard](docs/screenshots/dashboard.png) | ![Loupe status page](docs/screenshots/status-page.png) |
+
 ## Quickstart
 
 ```bash

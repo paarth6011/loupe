@@ -30,7 +30,9 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] Per-source ingestion API keys (`X-API-Key`) for `POST /metrics` — revocable,
       hashed at rest, managed in the dashboard / `/apikeys`; the admin JWT stays
       valid for the dashboard and manual posting
-- [ ] Published, versioned container images (GHCR) + tagged releases
+- [x] Published, versioned container images (GHCR) + tagged releases: pushing a
+      `v*` tag builds and publishes `loupe-backend`/`loupe-frontend` to GHCR and
+      drafts a GitHub Release (`.github/workflows/release.yml`); see RELEASING.md
 - [x] Lint/format in CI (ruff, prettier)
 - [x] Configurable monitors/thresholds via the UI/API (not just env vars):
       per-workload enable/disable + threshold overrides for every rule

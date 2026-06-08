@@ -1,3 +1,7 @@
+# Project name fixes the container/network prefix to "loupe" regardless of the
+# folder name (so `loupe-backend-1`, etc.).
+name: loupe
+
 services:
   db:
     image: postgres:16

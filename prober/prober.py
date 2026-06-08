@@ -84,7 +84,7 @@ def probe(client: httpx.Client, url: str) -> tuple[int, str]:
 
 def main() -> None:
     # Identify ourselves like a real monitor; some servers 403 anonymous clients.
-    with httpx.Client(headers={"User-Agent": "cloud-ops-prober/1.0"}) as client:
+    with httpx.Client(headers={"User-Agent": "loupe-prober/1.0"}) as client:
         wait_for_backend(client)
         headers = login(client)
         print(
