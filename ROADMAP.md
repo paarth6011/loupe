@@ -63,7 +63,11 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       fully explainable — every alert records its `detector` and the numbers
       (recent mean, baseline mean ± σ, sample count). No black-box models
 - [ ] Pluggable summarizer incl. local models (Ollama) so the AI feature is $0
-- [ ] Public read-only status page
+- [x] Public read-only status page: a no-auth `GET /status` and `/status` page
+      showing each *published* workload's health (operational / degraded / down /
+      unknown), 24h uptime, and p50 latency — derived explainably from open
+      alerts + recent samples, never exposing cost/tokens. Workloads are opt-in
+      via a per-workload "Public" toggle (`PATCH /workloads/{id}`)
 
 ## Scale / correctness (before heavy real use)
 

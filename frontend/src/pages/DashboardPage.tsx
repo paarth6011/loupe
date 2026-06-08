@@ -4,6 +4,7 @@ import { listAlerts } from "../api/alerts";
 import { ApiError } from "../api/client";
 import { openEventStream } from "../api/events";
 import { getCost, getSummary, getTimeseries } from "../api/metrics";
+import { setWorkloadPublic } from "../api/status";
 import { listWorkloads } from "../api/workloads";
 import AlertsPanel from "../components/AlertsPanel";
 import ApiKeysPanel from "../components/ApiKeysPanel";
@@ -64,6 +65,17 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
     },
     [onLogout],
   );
+
+  // Publish/unpublish the selected workload on the public status page.
+  async function togglePublic(next: boolean) {
+    if (selectedId == null) return;
+    try {
+      const updated = await setWorkloadPublic(selectedId, next);
+      setWorkloads((ws) => ws.map((w) => (w.id === updated.id ? updated : w)));
+    } catch (e) {
+      handleError(e);
+    }
+  }
 
   // Load workloads once and default the selection to the first one.
   useEffect(() => {
@@ -187,6 +199,23 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
             </option>
           ))}
         </select>
+        <label className="public-toggle" title="Show on the public status page">
+          <input
+            type="checkbox"
+            checked={selected?.public ?? false}
+            disabled={selectedId == null}
+            onChange={(e) => togglePublic(e.target.checked)}
+          />
+          Public
+        </label>
+        <a
+          className="secondary linkbtn"
+          href="/status"
+          target="_blank"
+          rel="noreferrer"
+        >
+          🌐 Status page
+        </a>
         <button
           className="secondary"
           disabled={selectedId == null}

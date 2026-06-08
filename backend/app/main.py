@@ -15,6 +15,7 @@ from app.routers import (
     health,
     metrics,
     monitors,
+    status,
     workloads,
 )
 
@@ -56,6 +57,7 @@ app.include_router(monitors.router)
 app.include_router(apikeys.router)
 app.include_router(admin.router)
 app.include_router(events.router)
+app.include_router(status.router)
 
 # Background data retention (no-op unless RETENTION_DAYS > 0).
 start_retention_worker(

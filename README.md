@@ -59,6 +59,8 @@ automatically on first boot.
 - `POST /metrics` (auth: API key via `X-API-Key`, or admin JWT) — ingest a sample; evaluates thresholds on insert
 - `POST /apikeys` · `GET /apikeys` · `DELETE /apikeys/{id}` (admin JWT) — manage ingestion keys
 - `GET  /workloads` (auth)
+- `PATCH /workloads/{id}` (auth) — publish/unpublish a workload on the status page
+- `GET  /status` (**no auth**) — public status page: health of published workloads only
 - `GET  /metrics/summary?workload_id=&window=` (auth) — p50/p95, error rate, count, tokens, cost
 - `GET  /metrics/timeseries?workload_id=&window=&bucket=` (auth) — bucketed latency/errors + tokens/cost
 - `GET  /metrics/cost?window=` (auth) — account-wide spend, broken down by model and workload
@@ -117,6 +119,15 @@ metric samples and stale resolved alerts older than that many days. A background
 sweep runs every `RETENTION_SWEEP_HOURS`; `POST /admin/prune?days=N` (admin)
 triggers it on demand. Aggregation (summary, cost, timeseries) runs in SQL, so
 these endpoints scale with the table rather than loading it into the app.
+
+**Public status page:** a no-auth page at **`/status`** (data from `GET /status`)
+shows the health of workloads you explicitly publish — operational / degraded /
+down / unknown, plus 24h uptime and p50 latency. Status is derived the same
+explainable way as alerts (an open critical alert is an outage, an open warning
+is a degradation, a workload that stopped reporting is "unknown"), and the page
+never exposes cost, tokens, or alert detail. Workloads are opt-in: flip the
+**Public** toggle next to a workload in the dashboard (which calls
+`PATCH /workloads/{id}`). Nothing is published by default.
 
 **Live updates:** the dashboard subscribes to a single `GET /events`
 Server-Sent Events stream and refetches only when the server signals new data

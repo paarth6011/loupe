@@ -5,7 +5,12 @@ import type { Workload } from "../types";
 import AlertsPanel from "./AlertsPanel";
 
 const workloads: Workload[] = [
-  { id: 1, name: "gpt-4o-chat", created_at: "2026-01-01T00:00:00Z" },
+  {
+    id: 1,
+    name: "gpt-4o-chat",
+    created_at: "2026-01-01T00:00:00Z",
+    public: false,
+  },
 ];
 
 describe("AlertsPanel", () => {

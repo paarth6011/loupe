@@ -533,3 +533,135 @@ button.danger {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---------- Header: publish toggle + status-page link ---------- */
+.public-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.public-toggle input {
+  cursor: pointer;
+}
+a.linkbtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+/* ---------- Public status page ---------- */
+.status-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+}
+.status-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.status-subtitle {
+  color: var(--muted);
+  font-size: 15px;
+}
+.status-overall {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 600;
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  margin-bottom: 20px;
+}
+.status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+.status-row:first-child {
+  border-top: none;
+}
+.status-name {
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.status-meta {
+  color: var(--muted);
+  font-size: 13px;
+  flex: 1 1 auto;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* Status colors, shared by the overall banner and per-service badges. */
+.status-operational {
+  color: var(--green);
+}
+.status-degraded {
+  color: var(--amber);
+}
+.status-down {
+  color: var(--red);
+}
+.status-unknown {
+  color: var(--muted);
+}
+.status-badge.status-operational {
+  background: rgba(74, 222, 128, 0.14);
+}
+.status-badge.status-degraded {
+  background: rgba(245, 158, 11, 0.16);
+}
+.status-badge.status-down {
+  background: rgba(248, 113, 113, 0.16);
+}
+.status-badge.status-unknown {
+  background: rgba(124, 138, 165, 0.16);
+}
+.status-empty {
+  color: var(--muted);
+  padding: 24px 4px;
+}
+.status-foot {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 18px;
+  text-align: right;
+}

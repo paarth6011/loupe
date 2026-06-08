@@ -9,6 +9,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,6 +24,10 @@ class Workload(Base):
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # When true, this workload appears on the public, no-auth status page.
+    public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=false()
     )
 
     samples: Mapped[list["MetricSample"]] = relationship(

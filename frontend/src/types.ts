@@ -2,6 +2,21 @@ export interface Workload {
   id: number;
   name: string;
   created_at: string;
+  public: boolean;
+}
+
+export interface StatusComponent {
+  name: string;
+  status: "operational" | "degraded" | "down" | "unknown";
+  uptime_24h: number | null;
+  latency_p50_ms: number | null;
+  last_sample_at: string | null;
+}
+
+export interface StatusPage {
+  overall: "operational" | "degraded" | "down";
+  generated_at: string;
+  components: StatusComponent[];
 }
 
 export interface Alert {
