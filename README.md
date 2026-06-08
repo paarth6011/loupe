@@ -111,6 +111,12 @@ no redeploy — via the **⚙ Monitors** modal in the dashboard or the
 `/workloads/{id}/monitors` API. Disabling a rule mutes it and clears its active
 alerts; an empty threshold falls back to the global default.
 
+**Data retention:** set `RETENTION_DAYS` (default `0` = keep forever) to prune
+metric samples and stale resolved alerts older than that many days. A background
+sweep runs every `RETENTION_SWEEP_HOURS`; `POST /admin/prune?days=N` (admin)
+triggers it on demand. Aggregation (summary, cost, timeseries) runs in SQL, so
+these endpoints scale with the table rather than loading it into the app.
+
 **Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
 webhook to get pinged when an alert fires or resolves. The payload includes
 `text` (Slack), `content` (Discord), and structured `alert` fields; empty

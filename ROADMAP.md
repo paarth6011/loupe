@@ -67,8 +67,13 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 
 ## Scale / correctness (before heavy real use)
 
-- [ ] Push aggregation into SQL (today it loads samples into Python) + data
-      retention and downsampling (e.g. TimescaleDB / continuous aggregates)
+- [x] Push aggregation into SQL: `/metrics/summary`, `/metrics/cost`, and the
+      timeseries fetch now filter by time-window in the DB and aggregate with
+      `COUNT`/`SUM`/`GROUP BY` (percentiles via Postgres `percentile_cont`, with
+      a Python fallback on SQLite) — no more loading whole tables into Python
+- [x] Data retention: `RETENTION_DAYS` prunes old samples + stale resolved
+      alerts via a background sweep and an admin endpoint (`POST /admin/prune`).
+      Continuous-aggregate downsampling (TimescaleDB) still future
 - [ ] Live updates via SSE/WebSocket instead of polling
 - [ ] Keep the core cloud-agnostic; treat GCP/Terraform as one deploy example
 

@@ -34,3 +34,14 @@ def percentile(values: list[int | float], pct: float) -> float | None:
 def as_utc(dt: datetime) -> datetime:
     """Treat naive timestamps (SQLite) as UTC; pass through aware ones (Postgres)."""
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def window_start(dialect_name: str, delta: timedelta) -> datetime:
+    """Lower time bound for a window, normalized for the DB dialect so it can be
+    compared in SQL.
+
+    Postgres keeps tz-aware UTC timestamps; SQLite stores naive UTC strings
+    (from CURRENT_TIMESTAMP), so we hand it a naive UTC bound to compare against.
+    """
+    start = datetime.now(timezone.utc) - delta
+    return start.replace(tzinfo=None) if dialect_name == "sqlite" else start

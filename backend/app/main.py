@@ -4,7 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.database import SessionLocal
+from app.retention import start_retention_worker
 from app.routers import (
+    admin,
     alerts,
     apikeys,
     auth,
@@ -50,3 +53,9 @@ app.include_router(workloads.router)
 app.include_router(alerts.router)
 app.include_router(monitors.router)
 app.include_router(apikeys.router)
+app.include_router(admin.router)
+
+# Background data retention (no-op unless RETENTION_DAYS > 0).
+start_retention_worker(
+    SessionLocal, _settings.retention_days, _settings.retention_sweep_hours
+)

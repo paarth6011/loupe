@@ -2,10 +2,10 @@ from datetime import datetime, timezone
 from math import ceil
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.aggregation import as_utc, parse_window, percentile
+from app.aggregation import as_utc, parse_window, percentile, window_start
 from app.alerting import evaluate_thresholds
 from app.cache import Cache, get_cache
 from app.config import Settings, get_settings
@@ -35,6 +35,27 @@ from app.summarizer import (
 MAX_BUCKETS = 500
 
 router = APIRouter(tags=["metrics"])
+
+
+def _latency_percentiles(
+    db: Session, conditions: list
+) -> tuple[float | None, float | None]:
+    """p50/p95 of latency_ms under the given filter.
+
+    Uses SQL ``percentile_cont`` on Postgres (continuous/linear-interpolated, so
+    it matches our Python ``percentile``); falls back to fetching just the
+    latency column and computing in Python on SQLite, which lacks that function.
+    """
+    if db.bind.dialect.name == "postgresql":
+        row = db.execute(
+            select(
+                func.percentile_cont(0.5).within_group(MetricSample.latency_ms.asc()),
+                func.percentile_cont(0.95).within_group(MetricSample.latency_ms.asc()),
+            ).where(*conditions)
+        ).one()
+        return row[0], row[1]
+    latencies = db.scalars(select(MetricSample.latency_ms).where(*conditions)).all()
+    return percentile(list(latencies), 50), percentile(list(latencies), 95)
 
 
 def _get_or_create_workload(db: Session, name: str) -> Workload:
@@ -167,16 +188,23 @@ def metrics_summary(
             status_code=status.HTTP_404_NOT_FOUND, detail="workload not found"
         )
 
-    since = datetime.now(timezone.utc) - delta
-    samples = db.scalars(
-        select(MetricSample).where(MetricSample.workload_id == workload_id)
-    ).all()
-    # Filter in Python so the window comparison is tz-safe across SQLite/Postgres.
-    in_window = [s for s in samples if as_utc(s.ts) >= since]
+    start = window_start(db.bind.dialect.name, delta)
+    conds = [MetricSample.workload_id == workload_id, MetricSample.ts >= start]
 
-    count = len(in_window)
-    errors = sum(1 for s in in_window if s.status == "error")
-    latencies = [s.latency_ms for s in in_window]
+    # Counts, error count, and token/cost totals are computed in SQL so the whole
+    # window never lands in Python.
+    count, errors, total_in, total_out, total_cost = db.execute(
+        select(
+            func.count(),
+            func.coalesce(
+                func.sum(case((MetricSample.status == "error", 1), else_=0)), 0
+            ),
+            func.coalesce(func.sum(MetricSample.input_tokens), 0),
+            func.coalesce(func.sum(MetricSample.output_tokens), 0),
+            func.coalesce(func.sum(MetricSample.cost_usd), 0.0),
+        ).where(*conds)
+    ).one()
+    p50, p95 = _latency_percentiles(db, conds)
 
     summary = MetricsSummary(
         workload_id=workload_id,
@@ -184,11 +212,11 @@ def metrics_summary(
         request_count=count,
         error_count=errors,
         error_rate=round(errors / count, 4) if count else 0.0,
-        latency_p50_ms=percentile(latencies, 50),
-        latency_p95_ms=percentile(latencies, 95),
-        total_input_tokens=sum(s.input_tokens or 0 for s in in_window),
-        total_output_tokens=sum(s.output_tokens or 0 for s in in_window),
-        total_cost_usd=round(sum(s.cost_usd or 0.0 for s in in_window), 6),
+        latency_p50_ms=p50,
+        latency_p95_ms=p95,
+        total_input_tokens=total_in,
+        total_output_tokens=total_out,
+        total_cost_usd=round(total_cost, 6),
     )
     cache.set(cache_key, summary.model_dump_json(), settings.summary_cache_ttl_seconds)
     return summary
@@ -229,18 +257,30 @@ def metrics_timeseries(
 
     now = datetime.now(timezone.utc)
     start = now - window_delta
-    samples = db.scalars(
-        select(MetricSample).where(MetricSample.workload_id == workload_id)
+    # Pull only the columns we bucket, and only those inside the window, instead
+    # of loading every sample row for the workload.
+    rows = db.execute(
+        select(
+            MetricSample.ts,
+            MetricSample.latency_ms,
+            MetricSample.status,
+            MetricSample.input_tokens,
+            MetricSample.output_tokens,
+            MetricSample.cost_usd,
+        ).where(
+            MetricSample.workload_id == workload_id,
+            MetricSample.ts >= window_start(db.bind.dialect.name, window_delta),
+        )
     ).all()
 
-    grouped: list[list[MetricSample]] = [[] for _ in range(n_buckets)]
-    for s in samples:
-        ts = as_utc(s.ts)
+    grouped: list[list] = [[] for _ in range(n_buckets)]
+    for r in rows:
+        ts = as_utc(r.ts)
         if ts < start or ts > now:
             continue
         idx = int((ts - start) / bucket_delta)
         idx = min(idx, n_buckets - 1)  # clamp the right edge
-        grouped[idx].append(s)
+        grouped[idx].append(r)
 
     points: list[TimeseriesPoint] = []
     for i, group in enumerate(grouped):
@@ -279,63 +319,60 @@ def metrics_cost(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         )
 
-    since = datetime.now(timezone.utc) - delta
-    samples = db.scalars(select(MetricSample)).all()
-    in_window = [s for s in samples if as_utc(s.ts) >= since]
-    names = {w.id: w.name for w in db.scalars(select(Workload)).all()}
+    start = window_start(db.bind.dialect.name, delta)
+    in_win = MetricSample.ts >= start
+    _in = func.coalesce(func.sum(MetricSample.input_tokens), 0)
+    _out = func.coalesce(func.sum(MetricSample.output_tokens), 0)
+    _cost = func.coalesce(func.sum(MetricSample.cost_usd), 0.0)
 
-    by_model: dict[tuple[str, str | None], dict] = {}
-    by_workload: dict[int, dict] = {}
-    total_in = total_out = 0
-    total_cost = 0.0
+    # All rollups are computed by the database, so spend reporting scales with
+    # the table instead of pulling every sample into the app.
+    total_requests, total_in, total_out, total_cost = db.execute(
+        select(func.count(), _in, _out, _cost).where(in_win)
+    ).one()
 
-    for s in in_window:
-        it, ot, cost = s.input_tokens or 0, s.output_tokens or 0, s.cost_usd or 0.0
-        total_in += it
-        total_out += ot
-        total_cost += cost
-
-        wl = by_workload.setdefault(s.workload_id, {"requests": 0, "cost": 0.0})
-        wl["requests"] += 1
-        wl["cost"] += cost
-
-        if s.model:
-            key = (s.model, s.provider)
-            md = by_model.setdefault(
-                key, {"requests": 0, "in": 0, "out": 0, "cost": 0.0}
-            )
-            md["requests"] += 1
-            md["in"] += it
-            md["out"] += ot
-            md["cost"] += cost
-
+    model_rows = db.execute(
+        select(
+            MetricSample.model, MetricSample.provider, func.count(), _in, _out, _cost
+        )
+        .where(in_win, MetricSample.model.is_not(None))
+        .group_by(MetricSample.model, MetricSample.provider)
+    ).all()
     models = [
         CostByModel(
             model=m,
             provider=p,
-            requests=v["requests"],
-            input_tokens=v["in"],
-            output_tokens=v["out"],
-            cost_usd=round(v["cost"], 6),
+            requests=rq,
+            input_tokens=it,
+            output_tokens=ot,
+            cost_usd=round(c, 6),
         )
-        for (m, p), v in by_model.items()
+        for m, p, rq, it, ot, c in model_rows
     ]
     models.sort(key=lambda x: x.cost_usd, reverse=True)
 
+    workload_rows = db.execute(
+        select(
+            Workload.id,
+            Workload.name,
+            func.count(MetricSample.id),
+            func.coalesce(func.sum(MetricSample.cost_usd), 0.0),
+        )
+        .join(MetricSample, MetricSample.workload_id == Workload.id)
+        .where(in_win)
+        .group_by(Workload.id, Workload.name)
+    ).all()
     workloads = [
         CostByWorkload(
-            workload_id=wid,
-            workload=names.get(wid, f"#{wid}"),
-            requests=v["requests"],
-            cost_usd=round(v["cost"], 6),
+            workload_id=wid, workload=name, requests=rq, cost_usd=round(c, 6)
         )
-        for wid, v in by_workload.items()
+        for wid, name, rq, c in workload_rows
     ]
     workloads.sort(key=lambda x: x.cost_usd, reverse=True)
 
     return CostSummary(
         window=window,
-        total_requests=len(in_window),
+        total_requests=total_requests,
         total_input_tokens=total_in,
         total_output_tokens=total_out,
         total_cost_usd=round(total_cost, 6),

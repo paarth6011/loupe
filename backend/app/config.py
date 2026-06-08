@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     rate_limit_threshold: float = 0.2  # fraction of recent calls that are 429s
     rate_limit_min_samples: int = 5  # need at least this many before evaluating
 
+    # Data retention. 0 disables pruning (keep forever). When > 0, samples older
+    # than this many days are deleted; a background sweep runs every
+    # retention_sweep_hours. Resolved alerts older than the cutoff go too.
+    retention_days: int = 0
+    retention_sweep_hours: int = 24
+
     # Statistical anomaly detection (rolling-window z-score, per workload+metric).
     # Learns each workload's own baseline instead of using a fixed threshold.
     anomaly_recent_samples: int = 5  # newest calls compared against the baseline
