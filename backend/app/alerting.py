@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -43,8 +44,16 @@ def _reconcile(
             severity=severity,
             detector=detector,
         )
-        db.add(alert)
-        db.flush()
+        # A concurrent ingest may open the same alert between our read and this
+        # insert; the partial unique index rejects the duplicate. Do the add+flush
+        # inside a savepoint so its rollback both discards our duplicate and
+        # leaves the surrounding ingest transaction usable.
+        try:
+            with db.begin_nested():
+                db.add(alert)
+                db.flush()
+        except IntegrityError:
+            return  # another ingest opened it first — nothing to do
         opened.append(alert)
     elif not firing and existing is not None:
         existing.resolved_at = datetime.now(timezone.utc)

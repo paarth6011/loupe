@@ -5,12 +5,14 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     false,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -70,6 +72,21 @@ class MetricSample(Base):
 
 class Alert(Base):
     __tablename__ = "alerts"
+
+    # Enforce the dedup invariant in the DB: at most one *unresolved* alert per
+    # (workload, rule). Without this, concurrent ingests race and create
+    # duplicate open alerts (and duplicate notifications/summaries). A partial
+    # unique index lets a new alert open again once the prior one is resolved.
+    __table_args__ = (
+        Index(
+            "uq_open_alert_per_rule",
+            "workload_id",
+            "rule",
+            unique=True,
+            sqlite_where=text("resolved_at IS NULL"),
+            postgresql_where=text("resolved_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workload_id: Mapped[int] = mapped_column(

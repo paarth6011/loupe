@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import atexit
 import os
+import queue
 import threading
 
 import httpx
+
+# Bounded so a misbehaving/offline backend can't grow memory without limit; we
+# shed load rather than block the caller's hot path.
+_MAX_QUEUE = 10_000
 
 
 class Reporter:
     """Ships metric samples to a Loupe backend.
 
-    Reporting is non-blocking (fire-and-forget on a daemon thread) and never
-    raises into the caller's code path — observability must not break the app.
+    Reporting is non-blocking and never raises into the caller's code path —
+    observability must not break the app. Samples are enqueued and drained by a
+    single background worker, which (a) bounds resource use no matter the call
+    rate, (b) serializes login/token handling, and (c) can be flushed at exit so
+    short-lived scripts don't lose their final samples.
 
     Auth, in order of preference:
       1. ``api_key`` — a revocable ingestion key (recommended; sent as
@@ -34,6 +43,15 @@ class Reporter:
         self._token = token
         self._api_key = api_key
         self._client = httpx.Client(timeout=timeout)
+        self._queue: queue.Queue[dict] = queue.Queue(maxsize=_MAX_QUEUE)
+        self._login_lock = threading.Lock()
+        self._worker = threading.Thread(
+            target=self._run, name="loupe-reporter", daemon=True
+        )
+        self._worker.start()
+        # Best-effort drain at interpreter exit so a script that reports then
+        # exits immediately doesn't drop its last samples.
+        atexit.register(self.flush)
 
     @classmethod
     def from_env(cls) -> Reporter:
@@ -46,10 +64,30 @@ class Reporter:
         )
 
     def report(self, **fields) -> None:
+        """Enqueue a sample for delivery. Non-blocking; drops under extreme
+        backpressure rather than stalling the caller."""
         payload = {k: v for k, v in fields.items() if v is not None}
-        threading.Thread(target=self._send, args=(payload,), daemon=True).start()
+        try:
+            self._queue.put_nowait(payload)
+        except queue.Full:
+            pass  # backend unreachable/slow — shed load, never block the app
+
+    def flush(self, timeout: float = 3.0) -> None:
+        """Wait (up to ``timeout`` seconds) for queued samples to be sent.
+        Bounded so it can't hang process exit if the backend is unresponsive."""
+        waiter = threading.Thread(target=self._queue.join, daemon=True)
+        waiter.start()
+        waiter.join(timeout)
 
     # -- internals -----------------------------------------------------------
+
+    def _run(self) -> None:
+        while True:
+            payload = self._queue.get()
+            try:
+                self._send(payload)
+            finally:
+                self._queue.task_done()
 
     def _login(self) -> None:
         resp = self._client.post(
@@ -75,10 +113,13 @@ class Reporter:
                 self._post(payload)
                 return
             if not self._token:
-                self._login()
+                with self._login_lock:
+                    if not self._token:
+                        self._login()
             resp = self._post(payload)
             if resp.status_code == 401:  # token expired -> re-login and retry once
-                self._login()
+                with self._login_lock:
+                    self._login()
                 self._post(payload)
         except Exception:
             pass  # swallow — never break the caller

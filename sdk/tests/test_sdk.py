@@ -138,3 +138,27 @@ def test_reporter_uses_api_key_header_and_skips_login():
     assert url.endswith("/metrics")
     assert headers == {"X-API-Key": "loupe_sk_test"}
     assert all("/auth/login" not in p[0] for p in posts)
+
+
+def test_report_enqueues_and_flush_delivers():
+    # report() is async (queued); flush() must drain it before we assert — this
+    # is the path that, with the old fire-and-forget daemon thread, dropped the
+    # final samples when a script exited immediately.
+    rep = Reporter(url="http://x", api_key="loupe_sk_test")
+    rep._client = FakeHttpClient()
+
+    rep.report(workload="w", latency_ms=5, status="ok")
+    rep.flush(timeout=3.0)
+
+    assert len(rep._client.posts) == 1
+    url, body, headers = rep._client.posts[0]
+    assert url.endswith("/metrics")
+    assert body == {"workload": "w", "latency_ms": 5, "status": "ok"}
+
+
+def test_report_never_raises_when_backend_unreachable():
+    # A real (unreachable) client: report must not raise into the caller, and
+    # flush must stay bounded even though the send fails.
+    rep = Reporter(url="http://127.0.0.1:9", api_key="k", timeout=0.2)
+    rep.report(workload="w", latency_ms=1, status="ok")
+    rep.flush(timeout=2.0)  # returns; the failed send was swallowed
