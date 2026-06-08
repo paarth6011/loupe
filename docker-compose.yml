@@ -39,6 +39,16 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      # Incident summaries. Default "auto": Claude if a key is set, else $0 template.
+      SUMMARY_PROVIDER: ${SUMMARY_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SUMMARY_MODEL: ${SUMMARY_MODEL:-claude-haiku-4-5}
+      # Local Ollama ($0, offline) when SUMMARY_PROVIDER=ollama. host.docker.internal
+      # reaches an Ollama running on the host (mapped below for Linux too).
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     depends_on:

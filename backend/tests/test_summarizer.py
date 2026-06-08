@@ -1,9 +1,25 @@
+from types import SimpleNamespace
+
+from app import summarizer as sz
 from app.models import Alert, Workload
 from app.summarizer import (
     AlertContext,
+    OllamaSummarizer,
     TemplateSummarizer,
     generate_and_store_summary,
 )
+
+
+def _settings(**overrides) -> SimpleNamespace:
+    base = dict(
+        summary_provider="auto",
+        anthropic_api_key="",
+        summary_model="claude-haiku-4-5",
+        ollama_url="http://localhost:11434",
+        ollama_model="llama3.2",
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
 
 
 def _ctx(**overrides) -> AlertContext:
@@ -68,3 +84,63 @@ def test_generate_summary_swallows_summarizer_errors(db_session):
 
     db_session.refresh(alert)
     assert alert.summary is None
+
+
+def test_ollama_summarizer_calls_local_api(monkeypatch):
+    import httpx
+
+    captured = {}
+
+    class FakeResp:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> dict:
+            return {"message": {"content": "  Latency spiked on gpt-4o-chat.  "}}
+
+    def fake_post(url, json, timeout):
+        captured.update(url=url, json=json, timeout=timeout)
+        return FakeResp()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    out = OllamaSummarizer("http://ollama:11434/", "llama3.2").summarize(_ctx())
+
+    assert out == "Latency spiked on gpt-4o-chat."  # whitespace trimmed
+    assert captured["url"] == "http://ollama:11434/api/chat"  # trailing slash gone
+    body = captured["json"]
+    assert body["model"] == "llama3.2"
+    assert body["stream"] is False
+    assert body["messages"][0]["role"] == "system"
+    assert "gpt-4o-chat" in body["messages"][1]["content"]
+
+
+def test_get_summarizer_template_provider(monkeypatch):
+    monkeypatch.setattr(
+        sz, "get_settings", lambda: _settings(summary_provider="template")
+    )
+    assert isinstance(sz.get_summarizer(), TemplateSummarizer)
+
+
+def test_get_summarizer_ollama_provider(monkeypatch):
+    monkeypatch.setattr(
+        sz,
+        "get_settings",
+        lambda: _settings(summary_provider="ollama", ollama_model="mistral"),
+    )
+    summarizer = sz.get_summarizer()
+    assert isinstance(summarizer, OllamaSummarizer)
+    assert summarizer._model == "mistral"
+
+
+def test_get_summarizer_auto_without_key_is_template(monkeypatch):
+    monkeypatch.setattr(sz, "get_settings", lambda: _settings(summary_provider="auto"))
+    assert isinstance(sz.get_summarizer(), TemplateSummarizer)
+
+
+def test_get_summarizer_claude_without_key_falls_back(monkeypatch):
+    monkeypatch.setattr(
+        sz, "get_settings", lambda: _settings(summary_provider="claude")
+    )
+    # Requested Claude but no key -> degrade to template instead of crashing.
+    assert isinstance(sz.get_summarizer(), TemplateSummarizer)

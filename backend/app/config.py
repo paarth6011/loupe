@@ -62,8 +62,18 @@ class Settings(BaseSettings):
     summary_cache_ttl_seconds: int = 15
 
     # LLM incident summaries (Phase 2). Empty key -> template fallback.
+    # Which summarizer to use:
+    #   "auto"     -> Claude if an API key is set, else the $0 template (default)
+    #   "template" -> always the deterministic, no-API template
+    #   "claude"   -> Anthropic API (falls back to template if no key)
+    #   "ollama"   -> a local Ollama server ($0, offline)
+    summary_provider: str = "auto"
     anthropic_api_key: str = ""
     summary_model: str = "claude-haiku-4-5"
+    # Local Ollama (used when summary_provider="ollama"). From inside Docker, a
+    # host-run Ollama is typically http://host.docker.internal:11434.
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2"
 
     # Alert notifications. Empty -> notifications disabled (NullNotifier).
     # Works with Slack / Discord / generic webhook receivers.

@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
@@ -6,6 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import Alert
+
+# Shared instruction for every model-backed summarizer (Claude, Ollama, …).
+_SYSTEM_PROMPT = (
+    "You are an SRE assistant. Given an alert and recent metric context, "
+    "write a concise 1-2 sentence plain-English incident summary for an "
+    "on-call engineer: what happened and a likely area to look at. "
+    "Respond with the summary only, no preamble."
+)
 
 
 @dataclass
@@ -56,13 +65,6 @@ class ClaudeSummarizer:
     propagates to the caller, which leaves Alert.summary NULL (backfilled later).
     """
 
-    _SYSTEM = (
-        "You are an SRE assistant. Given an alert and recent metric context, "
-        "write a concise 1-2 sentence plain-English incident summary for an "
-        "on-call engineer: what happened and a likely area to look at. "
-        "Respond with the summary only, no preamble."
-    )
-
     def __init__(self, api_key: str, model: str, timeout: float = 5.0) -> None:
         import anthropic  # lazy import so the template path needs no dependency
 
@@ -75,7 +77,7 @@ class ClaudeSummarizer:
         response = self._client.messages.create(
             model=self._model,
             max_tokens=150,
-            system=self._SYSTEM,
+            system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": _render_context(ctx)}],
         )
         return "".join(
@@ -83,9 +85,65 @@ class ClaudeSummarizer:
         ).strip()
 
 
+class OllamaSummarizer:
+    """Generates summaries via a local Ollama server — $0 and fully offline.
+
+    Same resilience contract as ClaudeSummarizer: a bounded timeout, and any
+    failure propagates so the background task leaves Alert.summary NULL. Local
+    models can be slow, but summarization runs off the ingest path, so a slow
+    response never blocks a metric write.
+    """
+
+    def __init__(self, base_url: str, model: str, timeout: float = 30.0) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._model = model
+        self._timeout = timeout
+
+    def summarize(self, ctx: AlertContext) -> str:
+        import httpx  # lazy import; only the Ollama path needs it
+
+        response = httpx.post(
+            f"{self._base_url}/api/chat",
+            json={
+                "model": self._model,
+                "stream": False,
+                "messages": [
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": _render_context(ctx)},
+                ],
+                # Cap output so a chatty local model stays terse.
+                "options": {"num_predict": 150},
+            },
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        return response.json()["message"]["content"].strip()
+
+
 def get_summarizer() -> Summarizer:
-    """Use Claude when an API key is configured, else the no-key template."""
+    """Pick a summarizer from SUMMARY_PROVIDER, defaulting to the safe path.
+
+    "auto" keeps the original behavior (Claude if a key exists, else template);
+    "template"/"ollama"/"claude" force a specific backend. "claude" without a key
+    degrades to the template rather than failing — summaries are best-effort.
+    """
     settings = get_settings()
+    provider = settings.summary_provider.strip().lower()
+
+    if provider == "template":
+        return TemplateSummarizer()
+    if provider == "ollama":
+        return OllamaSummarizer(settings.ollama_url, settings.ollama_model)
+    if provider == "claude":
+        if not settings.anthropic_api_key:
+            logging.getLogger("uvicorn.error").warning(
+                "SUMMARY_PROVIDER=claude but no ANTHROPIC_API_KEY; "
+                "using the template summarizer."
+            )
+            return TemplateSummarizer()
+        return ClaudeSummarizer(settings.anthropic_api_key, settings.summary_model)
+
+    # "auto" (default): Claude when a key is present, else the no-key template.
     if settings.anthropic_api_key:
         return ClaudeSummarizer(settings.anthropic_api_key, settings.summary_model)
     return TemplateSummarizer()

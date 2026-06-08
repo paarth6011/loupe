@@ -12,7 +12,8 @@ bcrypt==4.0.1
 python-multipart==0.0.20
 redis==5.2.1
 anthropic==0.40.0
+# Used at runtime for the local-Ollama summarizer (and by the test client).
+httpx==0.28.1
 
 # Tests
 pytest==8.3.4
-httpx==0.28.1

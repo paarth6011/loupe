@@ -62,7 +62,10 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       "slow/expensive for *this* workload" that fixed thresholds miss, and is
       fully explainable — every alert records its `detector` and the numbers
       (recent mean, baseline mean ± σ, sample count). No black-box models
-- [ ] Pluggable summarizer incl. local models (Ollama) so the AI feature is $0
+- [x] Pluggable summarizer incl. local models (Ollama) so the AI feature is $0:
+      `SUMMARY_PROVIDER` selects `auto` | `template` | `claude` | `ollama`. The
+      template and Ollama paths need no API key; `claude` degrades to the
+      template if no key is set. One `Summarizer` protocol, three backends
 - [x] Public read-only status page: a no-auth `GET /status` and `/status` page
       showing each *published* workload's health (operational / degraded / down /
       unknown), 24h uptime, and p50 latency — derived explainably from open

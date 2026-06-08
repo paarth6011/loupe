@@ -156,9 +156,21 @@ exactly one place, and even there the cost is a rounding error.
 ### The one optional spot: AI incident summaries
 
 The only feature that itself calls an LLM is the plain-English alert summary, and
-it's opt-in. With no `ANTHROPIC_API_KEY` set it uses a **deterministic template
-($0, no key)**; a local model (e.g. Ollama) is also $0. If you plug in a key for
-nicer summaries, each one is tiny (~180 input + ~60 output tokens):
+it's opt-in. `SUMMARY_PROVIDER` chooses the backend behind a single summarizer
+interface:
+
+| `SUMMARY_PROVIDER` | Backend | Key? | Cost |
+|---|---|---|---|
+| `auto` (default) | Claude if `ANTHROPIC_API_KEY` is set, else the template | optional | $0 or ~$0.0005/alert |
+| `template` | deterministic, no-API summary | no | **$0** |
+| `ollama` | a local Ollama server (`OLLAMA_URL` / `OLLAMA_MODEL`) | no | **$0**, offline |
+| `claude` | Anthropic API (degrades to template if no key) | yes | ~$0.0005/alert |
+
+For the **$0 local-model** path: install [Ollama](https://ollama.com), run
+`ollama pull llama3.2`, then set `SUMMARY_PROVIDER=ollama`. From the Docker
+backend, Ollama on the host is reached at `http://host.docker.internal:11434`
+(already the default). If you plug in a Claude key instead, each summary is tiny
+(~180 input + ~60 output tokens):
 
 - **~$0.0005 per alert** on Claude Haiku 4.5
 - ~**$0.50** per 1,000 alerts/month · ~**$5** per 10,000/month
