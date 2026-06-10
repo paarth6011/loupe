@@ -91,6 +91,12 @@ def evaluate_thresholds(
         .limit(history_n)
     ).all()
     recent = history[: settings.error_rate_window]
+    # The detectors must see only their own window: if error_rate_window is the
+    # larger span, the extra rows would inflate the anomaly baseline beyond
+    # anomaly_baseline_window. Slice the detector input back to its configured size.
+    anomaly_history = history[
+        : settings.anomaly_recent_samples + settings.anomaly_baseline_window
+    ]
 
     # All open alerts for this workload, fetched once and reused by every
     # _reconcile call below (replacing one SELECT per rule).
@@ -250,7 +256,7 @@ def evaluate_thresholds(
     # Rule: latency_anomaly — recent latency abnormally high vs the baseline.
     lat_anom_enabled, lat_z = cfg("latency_anomaly", settings.anomaly_z_threshold)
     lat = zscore_anomaly(
-        [float(s.latency_ms) for s in history],
+        [float(s.latency_ms) for s in anomaly_history],
         recent_samples=settings.anomaly_recent_samples,
         min_baseline=settings.anomaly_min_baseline,
         z_threshold=lat_z,
@@ -282,7 +288,7 @@ def evaluate_thresholds(
     # Dormant for HTTP workloads (no cost samples -> detector abstains).
     cost_anom_enabled, cost_z = cfg("cost_anomaly", settings.anomaly_z_threshold)
     cost = zscore_anomaly(
-        [float(s.cost_usd) for s in history if s.cost_usd is not None],
+        [float(s.cost_usd) for s in anomaly_history if s.cost_usd is not None],
         recent_samples=settings.anomaly_recent_samples,
         min_baseline=settings.anomaly_min_baseline,
         z_threshold=cost_z,

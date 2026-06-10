@@ -33,13 +33,16 @@ class RedisCache:
             pass
 
     def incr(self, key: str, ttl_seconds: int) -> int:
-        """Atomically increment a counter, setting its TTL on first creation.
+        """Increment a counter and (re)set its TTL in a single round trip, so a
+        crash can't leave a counter without an expiry (which would lock an IP out
+        forever). Refreshing the TTL each call makes this a sliding window.
         Returns the new value, or 0 if Redis is unavailable (fail-open: a cache
         outage must not lock anyone out)."""
         try:
-            value = self._client.incr(key)
-            if value == 1:
-                self._client.expire(key, ttl_seconds)
+            pipe = self._client.pipeline()
+            pipe.incr(key)
+            pipe.expire(key, ttl_seconds)
+            value, _ = pipe.execute()
             return value
         except redis.RedisError:
             return 0
