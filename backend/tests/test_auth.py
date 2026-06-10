@@ -64,6 +64,31 @@ def test_stream_ticket_endpoint_requires_auth_and_returns_usable_ticket(
     assert decode_stream_ticket(resp.json()["ticket"]) == "admin"
 
 
+# --- Frictionless dev login ---------------------------------------------------
+
+
+def test_dev_login_issues_admin_token_in_dev(client):
+    resp = client.post("/auth/dev-login")
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    assert decode_token(token) == "admin"
+    # The token is a real, general-purpose admin token: it authenticates /me.
+    me = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
+
+
+def test_dev_login_disabled_in_production(client):
+    from app.config import Settings, get_settings
+
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        environment="production"
+    )
+    try:
+        assert client.post("/auth/dev-login").status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_settings, None)
+
+
 # --- Brute-force protection (M1) ----------------------------------------------
 
 

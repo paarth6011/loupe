@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.auth import authenticate, create_access_token, create_stream_ticket
 from app.cache import Cache, get_cache
+from app.config import Settings, get_settings
 from app.deps import get_current_user
 from app.schemas.auth import (
     CurrentUser,
@@ -43,6 +44,22 @@ def login(
         )
     cache.delete(key)  # reset the failure counter on success
     return TokenResponse(access_token=create_access_token(body.username))
+
+
+@router.post("/dev-login", response_model=TokenResponse)
+def dev_login(settings: Settings = Depends(get_settings)) -> TokenResponse:
+    """Frictionless local login. In non-production environments only, issue an
+    admin token without credentials so the dashboard skips the sign-in screen on
+    a developer's machine.
+
+    Refused with 404 in production, where a real login (and a non-default
+    password, enforced at boot) is mandatory — so this endpoint effectively does
+    not exist on a deployed instance. It is a UX shortcut, not an auth bypass:
+    every protected endpoint still requires the resulting token.
+    """
+    if settings.is_production():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return TokenResponse(access_token=create_access_token(settings.admin_username))
 
 
 @router.post("/stream-ticket", response_model=StreamTicketResponse)
