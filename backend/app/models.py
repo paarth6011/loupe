@@ -46,6 +46,10 @@ class Workload(Base):
 class MetricSample(Base):
     __tablename__ = "metric_samples"
 
+    # Window/aggregation queries all filter "workload_id == ? AND ts >= ?", which
+    # the two single-column indexes serve poorly; this composite covers them.
+    __table_args__ = (Index("ix_samples_workload_ts", "workload_id", "ts"),)
+
     id: Mapped[int] = mapped_column(primary_key=True)
     workload_id: Mapped[int] = mapped_column(
         ForeignKey("workloads.id", ondelete="CASCADE"), index=True, nullable=False

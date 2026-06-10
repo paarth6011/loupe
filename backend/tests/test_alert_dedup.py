@@ -52,7 +52,7 @@ def test_resolved_alert_does_not_block_a_new_one(db_session):
     assert open_count == 1
 
 
-def test_reconcile_tolerates_lost_race(db_session, monkeypatch):
+def test_reconcile_tolerates_lost_race(db_session):
     """If a concurrent ingest opened the alert first (so our insert collides),
     _reconcile drops the duplicate without raising or recording it as opened."""
     wl = _wl(db_session)
@@ -61,13 +61,20 @@ def test_reconcile_tolerates_lost_race(db_session, monkeypatch):
     # production where the sample is flushed before reconcile runs.
     db_session.flush()
 
-    # Force the read to miss so _reconcile attempts an INSERT that collides.
-    monkeypatch.setattr(alerting, "_open_alert", lambda *a, **k: None)
-
+    # An empty open-by-rule snapshot simulates our read missing the alert a
+    # concurrent ingest just opened, so the INSERT collides with the unique index.
     opened: list = []
     resolved: list = []
     alerting._reconcile(
-        db_session, wl.id, "high_latency", True, "racing", "warning", opened, resolved
+        db_session,
+        {},
+        wl.id,
+        "high_latency",
+        True,
+        "racing",
+        "warning",
+        opened,
+        resolved,
     )
 
     assert opened == []  # duplicate dropped, no exception

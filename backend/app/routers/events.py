@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 from starlette.concurrency import run_in_threadpool
 
-from app.auth import decode_token
+from app.auth import decode_stream_ticket
 from app.database import get_session_factory
 from app.models import Alert, MetricSample
 
@@ -18,8 +18,9 @@ router = APIRouter(tags=["events"])
 # How often the server re-checks the DB for changes, and the maximum lifetime of
 # a single SSE connection before the client transparently reconnects. EventSource
 # reconnects on its own, so capping lifetime keeps a vanished client from holding
-# resources indefinitely.
-_POLL_SECONDS = 2.0
+# resources indefinitely. The poll interval is a per-viewer DB hit, so it's kept
+# coarse; many concurrent viewers would still warrant a shared poller.
+_POLL_SECONDS = 3.0
 _MAX_CONNECTION_SECONDS = 300.0
 
 
@@ -75,17 +76,19 @@ async def _event_stream(
 @router.get("/events")
 def events(
     request: Request,
-    token: str | None = Query(default=None),
+    ticket: str | None = Query(default=None),
     session_factory: sessionmaker = Depends(get_session_factory),
 ) -> StreamingResponse:
     """Live update stream. The dashboard opens this once and refetches whenever a
     `changed` event arrives, replacing fixed-interval polling.
 
-    EventSource can't set an Authorization header, so the JWT is passed as the
-    `token` query param and validated the same way as the bearer path. A 401 here
-    is terminal (bad/expired token); the client stops reconnecting and logs out.
+    EventSource can't set an Authorization header, so authentication uses a
+    short-lived, read-only *stream ticket* (minted via POST /auth/stream-ticket)
+    passed as the `ticket` query param — never the full admin JWT, which would
+    otherwise leak into proxy logs and browser history. A 401 here is terminal
+    for this connection; the client mints a fresh ticket and reconnects.
     """
-    if token is None or decode_token(token) is None:
+    if ticket is None or decode_stream_ticket(ticket) is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     return StreamingResponse(
         _event_stream(request, session_factory),

@@ -66,7 +66,9 @@ Keep it simple. Smallest thing that works, is testable, and is explainable.
 - Detection: numpy/scipy (or statsmodels) for z-score / EWMA baselines.
 - DB: PostgreSQL 16 (local) / Cloud SQL (deployed).
 - Cache: Redis 7 (local) / Memorystore (deployed).
-- LLM: OpenAI API (incident summaries).
+- LLM: pluggable incident summarizer — Anthropic Claude API, a local Ollama
+  server, or a deterministic $0 template fallback (configurable; defaults to
+  Claude when an API key is set, else the template).
 - Frontend: React + TypeScript + Vite, Recharts, shadcn/ui.
 - Auth: JWT (python-jose), bcrypt.
 - Cloud: GCP — Cloud Run, Artifact Registry, Cloud SQL, Memorystore,

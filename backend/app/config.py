@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = "admin"
 
+    # Cap on auto-created workloads (any valid ingest key can mint one by name).
+    # 0 disables the cap.
+    max_workloads: int = 1000
+
     # Alerting thresholds (evaluated on ingest)
     latency_threshold_ms: int = 1000
     error_rate_threshold: float = 0.5  # fraction of recent samples that are errors

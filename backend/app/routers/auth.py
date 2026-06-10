@@ -1,19 +1,57 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.auth import authenticate, create_access_token
+from app.auth import authenticate, create_access_token, create_stream_ticket
+from app.cache import Cache, get_cache
 from app.deps import get_current_user
-from app.schemas.auth import CurrentUser, LoginRequest, TokenResponse
+from app.schemas.auth import (
+    CurrentUser,
+    LoginRequest,
+    StreamTicketResponse,
+    TokenResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Brute-force protection: after this many *failed* attempts from one client IP
+# within the window, further attempts are refused with 429 until the window
+# rolls off. Successful logins reset the counter, so a legitimate user fumbling
+# their password is never locked out for long. Fail-open if the cache is down.
+_LOGIN_MAX_FAILURES = 10
+_LOGIN_WINDOW_SECONDS = 300
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest) -> TokenResponse:
+def login(
+    body: LoginRequest,
+    request: Request,
+    cache: Cache = Depends(get_cache),
+) -> TokenResponse:
+    key = f"login_fail:{_client_ip(request)}"
+    if int(cache.get(key) or 0) >= _LOGIN_MAX_FAILURES:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts; try again later.",
+        )
     if not authenticate(body.username, body.password):
+        cache.incr(key, _LOGIN_WINDOW_SECONDS)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
+    cache.delete(key)  # reset the failure counter on success
     return TokenResponse(access_token=create_access_token(body.username))
+
+
+@router.post("/stream-ticket", response_model=StreamTicketResponse)
+def stream_ticket(
+    user: CurrentUser = Depends(get_current_user),
+) -> StreamTicketResponse:
+    """Exchange the admin bearer token for a short-lived, read-only ticket used
+    to open the SSE stream. Keeps the full admin JWT out of the stream URL."""
+    return StreamTicketResponse(ticket=create_stream_ticket(user.username))
 
 
 @router.get("/me", response_model=CurrentUser)

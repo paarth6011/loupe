@@ -3,6 +3,7 @@ from math import ceil
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.aggregation import as_utc, parse_window, percentile, window_start
@@ -58,13 +59,38 @@ def _latency_percentiles(
     return percentile(list(latencies), 50), percentile(list(latencies), 95)
 
 
-def _get_or_create_workload(db: Session, name: str) -> Workload:
+def _get_or_create_workload(db: Session, name: str, max_workloads: int) -> Workload:
     workload = db.scalars(select(Workload).where(Workload.name == name)).first()
     if workload is not None:
         return workload
+
+    # Cap auto-created cardinality: any valid key can mint workloads by name, so
+    # without a ceiling a misbehaving or abusive client could create unlimited
+    # rows. 0 disables the cap. (Checked only on a genuinely new name, so the hot
+    # path of existing workloads is unaffected.)
+    if max_workloads > 0:
+        count = db.scalar(select(func.count()).select_from(Workload)) or 0
+        if count >= max_workloads:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"workload limit ({max_workloads}) reached",
+            )
+
+    # Two concurrent ingests for the same new name both miss the SELECT above and
+    # race to INSERT; the unique constraint lets only one win. Do the insert in a
+    # savepoint so the loser's IntegrityError rolls back just this statement
+    # (leaving the ingest transaction usable) and we re-read the winner.
     workload = Workload(name=name)
-    db.add(workload)
-    db.flush()
+    try:
+        with db.begin_nested():
+            db.add(workload)
+            db.flush()
+    except IntegrityError:
+        workload = db.scalars(
+            select(Workload).where(Workload.name == name)
+        ).first()
+        if workload is None:  # not the unique-name race — surface it
+            raise
     return workload
 
 
@@ -81,7 +107,7 @@ def ingest_metric(
     session_factory: sessionmaker = Depends(get_session_factory),
     _: None = Depends(require_ingest_auth),
 ) -> MetricIngestResponse:
-    workload = _get_or_create_workload(db, body.workload)
+    workload = _get_or_create_workload(db, body.workload, settings.max_workloads)
 
     # Use the client-supplied cost, else estimate it from model + token counts.
     cost_usd = body.cost_usd

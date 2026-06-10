@@ -9,18 +9,22 @@ from app.detection import zscore_anomaly
 from app.models import Alert, MetricSample, Monitor
 
 
-def _open_alert(db: Session, workload_id: int, rule: str) -> Alert | None:
-    return db.scalars(
+def _open_alerts_by_rule(db: Session, workload_id: int) -> dict[str, Alert]:
+    """All currently-open alerts for a workload, keyed by rule. Fetched once per
+    ingest so the per-rule reconcile below needs no further queries (the DB-level
+    unique index still guards against a concurrent open)."""
+    rows = db.scalars(
         select(Alert).where(
             Alert.workload_id == workload_id,
-            Alert.rule == rule,
             Alert.resolved_at.is_(None),
         )
-    ).first()
+    ).all()
+    return {a.rule: a for a in rows}
 
 
 def _reconcile(
     db: Session,
+    open_by_rule: dict[str, Alert],
     workload_id: int,
     rule: str,
     firing: bool,
@@ -35,7 +39,7 @@ def _reconcile(
     Dedup falls out naturally: at most one unresolved alert exists per
     (workload, rule), so a sustained breach does not create duplicates.
     """
-    existing = _open_alert(db, workload_id, rule)
+    existing = open_by_rule.get(rule)
     if firing and existing is None:
         alert = Alert(
             workload_id=workload_id,
@@ -72,12 +76,25 @@ def evaluate_thresholds(
     opened: list[Alert] = []
     resolved: list[Alert] = []
 
-    recent = db.scalars(
+    # One window fetch serves both the threshold rules (which look at the most
+    # recent `error_rate_window` samples) and the anomaly detectors (which need
+    # `anomaly_recent + anomaly_baseline` of history). Pull the larger span once,
+    # newest-first, and slice the threshold window off the front.
+    history_n = max(
+        settings.error_rate_window,
+        settings.anomaly_recent_samples + settings.anomaly_baseline_window,
+    )
+    history = db.scalars(
         select(MetricSample)
         .where(MetricSample.workload_id == sample.workload_id)
         .order_by(MetricSample.ts.desc(), MetricSample.id.desc())
-        .limit(settings.error_rate_window)
+        .limit(history_n)
     ).all()
+    recent = history[: settings.error_rate_window]
+
+    # All open alerts for this workload, fetched once and reused by every
+    # _reconcile call below (replacing one SELECT per rule).
+    open_by_rule = _open_alerts_by_rule(db, sample.workload_id)
 
     # Per-workload monitor overrides. Absent a row, a rule is enabled at its
     # global default threshold. Disabling a rule makes its firing False below,
@@ -102,6 +119,7 @@ def evaluate_thresholds(
     latency_severity = "critical" if max_latency >= 3 * lat_threshold else "warning"
     _reconcile(
         db,
+        open_by_rule,
         sample.workload_id,
         "high_latency",
         lat_enabled and max_latency > lat_threshold,
@@ -128,6 +146,7 @@ def evaluate_thresholds(
         )
     _reconcile(
         db,
+        open_by_rule,
         sample.workload_id,
         "high_error_rate",
         error_firing,
@@ -156,6 +175,7 @@ def evaluate_thresholds(
     )
     _reconcile(
         db,
+        open_by_rule,
         sample.workload_id,
         "cost_spike",
         cost_enabled and max_cost > cost_threshold,
@@ -183,6 +203,7 @@ def evaluate_thresholds(
     )
     _reconcile(
         db,
+        open_by_rule,
         sample.workload_id,
         "token_spike",
         tok_enabled and max_tokens > tok_threshold,
@@ -208,6 +229,7 @@ def evaluate_thresholds(
         )
     _reconcile(
         db,
+        open_by_rule,
         sample.workload_id,
         "rate_limit_surge",
         rl_firing,
@@ -220,13 +242,7 @@ def evaluate_thresholds(
     # --- Statistical anomaly detection (zscore) -----------------------------
     # Learn each workload's own baseline and flag when recent calls deviate from
     # it — catches "slow/expensive for THIS workload", which fixed thresholds
-    # miss. Needs more history than the threshold rules, so it fetches its own.
-    history = db.scalars(
-        select(MetricSample)
-        .where(MetricSample.workload_id == sample.workload_id)
-        .order_by(MetricSample.ts.desc(), MetricSample.id.desc())
-        .limit(settings.anomaly_recent_samples + settings.anomaly_baseline_window)
-    ).all()
+    # miss. Reuses the `history` span fetched above (sized for these detectors).
 
     def _severity_for(z: float, z_threshold: float) -> str:
         return "critical" if z >= 1.5 * z_threshold else "warning"
@@ -251,6 +267,7 @@ def evaluate_thresholds(
         )
     _reconcile(
         db,
+        open_by_rule,
         sample.workload_id,
         "latency_anomaly",
         lat_anom_enabled and lat is not None and lat.firing,
@@ -282,6 +299,7 @@ def evaluate_thresholds(
         )
     _reconcile(
         db,
+        open_by_rule,
         sample.workload_id,
         "cost_anomaly",
         cost_anom_enabled and cost is not None and cost.firing,

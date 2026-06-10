@@ -9,6 +9,8 @@ from app.config import get_settings
 class Cache(Protocol):
     def get(self, key: str) -> str | None: ...
     def set(self, key: str, value: str, ttl_seconds: int) -> None: ...
+    def incr(self, key: str, ttl_seconds: int) -> int: ...
+    def delete(self, key: str) -> None: ...
 
 
 class RedisCache:
@@ -30,6 +32,24 @@ class RedisCache:
         except redis.RedisError:
             pass
 
+    def incr(self, key: str, ttl_seconds: int) -> int:
+        """Atomically increment a counter, setting its TTL on first creation.
+        Returns the new value, or 0 if Redis is unavailable (fail-open: a cache
+        outage must not lock anyone out)."""
+        try:
+            value = self._client.incr(key)
+            if value == 1:
+                self._client.expire(key, ttl_seconds)
+            return value
+        except redis.RedisError:
+            return 0
+
+    def delete(self, key: str) -> None:
+        try:
+            self._client.delete(key)
+        except redis.RedisError:
+            pass
+
 
 class InMemoryCache:
     """Process-local cache used in tests (no Redis dependency)."""
@@ -42,6 +62,14 @@ class InMemoryCache:
 
     def set(self, key: str, value: str, ttl_seconds: int) -> None:
         self._store[key] = value
+
+    def incr(self, key: str, ttl_seconds: int) -> int:
+        value = int(self._store.get(key, "0")) + 1
+        self._store[key] = str(value)
+        return value
+
+    def delete(self, key: str) -> None:
+        self._store.pop(key, None)
 
 
 @lru_cache

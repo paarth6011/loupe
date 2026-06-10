@@ -7,13 +7,20 @@ from app.models import MetricSample, Workload
 from app.routers import events
 
 
-def test_events_requires_token(client):
-    # No token -> 401 before any streaming begins.
+def test_events_requires_ticket(client):
+    # No ticket -> 401 before any streaming begins.
     assert client.get("/events").status_code == 401
 
 
-def test_events_rejects_bad_token(client):
-    assert client.get("/events?token=not-a-real-jwt").status_code == 401
+def test_events_rejects_bad_ticket(client):
+    assert client.get("/events?ticket=not-a-real-jwt").status_code == 401
+
+
+def test_events_rejects_plain_admin_token(client, auth_headers):
+    # A full admin JWT must NOT be usable as a stream ticket (scope separation):
+    # the stream credential is deliberately narrow, so the broad token is refused.
+    admin_jwt = auth_headers["Authorization"].split(" ", 1)[1]
+    assert client.get(f"/events?ticket={admin_jwt}").status_code == 401
 
 
 class _FakeRequest:

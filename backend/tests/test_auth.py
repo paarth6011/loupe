@@ -1,5 +1,11 @@
 from fastapi.testclient import TestClient
 
+from app.auth import (
+    create_access_token,
+    create_stream_ticket,
+    decode_stream_ticket,
+    decode_token,
+)
 from app.main import app
 
 client = TestClient(app)
@@ -31,3 +37,57 @@ def test_me_requires_token():
 def test_me_rejects_invalid_token():
     resp = client.get("/auth/me", headers={"Authorization": "Bearer not.a.jwt"})
     assert resp.status_code == 401
+
+
+# --- Stream tickets (C1): a narrow, scope-separated credential -----------------
+
+
+def test_stream_ticket_and_access_token_are_scope_separated():
+    """An admin access token must not pass as a stream ticket, and vice versa —
+    so a URL-borne ticket can never be replayed against admin/ingest endpoints."""
+    access = create_access_token("admin")
+    ticket = create_stream_ticket("admin")
+
+    assert decode_token(access) == "admin"
+    assert decode_stream_ticket(ticket) == "admin"
+    # Cross-use is rejected both directions.
+    assert decode_stream_ticket(access) is None
+    assert decode_token(ticket) is None
+
+
+def test_stream_ticket_endpoint_requires_auth_and_returns_usable_ticket(
+    client, auth_headers
+):
+    assert client.post("/auth/stream-ticket").status_code == 401
+    resp = client.post("/auth/stream-ticket", headers=auth_headers)
+    assert resp.status_code == 200
+    assert decode_stream_ticket(resp.json()["ticket"]) == "admin"
+
+
+# --- Brute-force protection (M1) ----------------------------------------------
+
+
+def test_login_throttles_after_repeated_failures(client):
+    # Uses the fixture client (deterministic in-memory cache). Ten bad attempts
+    # are 401; the next is refused with 429 regardless of the password.
+    for _ in range(10):
+        bad = client.post(
+            "/auth/login", json={"username": "admin", "password": "nope"}
+        )
+        assert bad.status_code == 401
+    locked = client.post(
+        "/auth/login", json={"username": "admin", "password": "admin"}
+    )
+    assert locked.status_code == 429
+
+
+def test_login_success_resets_failure_counter(client):
+    for _ in range(3):
+        client.post("/auth/login", json={"username": "admin", "password": "nope"})
+    ok = client.post("/auth/login", json={"username": "admin", "password": "admin"})
+    assert ok.status_code == 200
+    # Counter cleared, so a fresh run of failures starts from zero (still 401).
+    again = client.post(
+        "/auth/login", json={"username": "admin", "password": "nope"}
+    )
+    assert again.status_code == 401

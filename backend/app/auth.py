@@ -8,6 +8,14 @@ from app.config import get_settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _settings = get_settings()
 
+# A stream ticket is a narrow, short-lived credential for the SSE endpoint.
+# Because EventSource can't set headers, it must travel in the URL query string,
+# so it is deliberately limited: it expires in seconds and carries this scope,
+# which the admin endpoints reject (see decode_token) — limiting the blast
+# radius if it ever leaks into a proxy/access log or browser history.
+STREAM_SCOPE = "stream"
+_STREAM_TICKET_TTL_SECONDS = 60
+
 # The single-role MVP admin password is supplied as plaintext via env; hash it
 # once at import so credential checks go through bcrypt verification.
 _ADMIN_PASSWORD_HASH = pwd_context.hash(_settings.admin_password)
@@ -32,12 +40,37 @@ def create_access_token(subject: str) -> str:
     return jwt.encode(payload, _settings.jwt_secret, algorithm=_settings.jwt_algorithm)
 
 
-def decode_token(token: str) -> str | None:
-    """Return the token subject (username) if valid, else None."""
+def create_stream_ticket(subject: str) -> str:
+    """Mint a short-lived, read-only ticket for the SSE stream (see STREAM_SCOPE)."""
+    expire = datetime.now(timezone.utc) + timedelta(seconds=_STREAM_TICKET_TTL_SECONDS)
+    payload = {"sub": subject, "exp": expire, "scope": STREAM_SCOPE}
+    return jwt.encode(payload, _settings.jwt_secret, algorithm=_settings.jwt_algorithm)
+
+
+def _decode(token: str) -> dict | None:
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token, _settings.jwt_secret, algorithms=[_settings.jwt_algorithm]
         )
     except JWTError:
+        return None
+
+
+def decode_token(token: str) -> str | None:
+    """Return the subject of a *general-purpose* access token, else None.
+
+    Scoped tokens (e.g. stream tickets) are rejected here so a narrow, URL-borne
+    credential can never be replayed against the admin/ingest endpoints.
+    """
+    payload = _decode(token)
+    if payload is None or payload.get("scope") is not None:
+        return None
+    return payload.get("sub")
+
+
+def decode_stream_ticket(token: str) -> str | None:
+    """Return the subject of a valid stream ticket, else None."""
+    payload = _decode(token)
+    if payload is None or payload.get("scope") != STREAM_SCOPE:
         return None
     return payload.get("sub")

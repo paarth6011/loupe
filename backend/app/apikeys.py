@@ -6,7 +6,7 @@ right store: fast to check on every ingest, and there's nothing to brute-force.
 
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,6 +15,11 @@ from app.models import ApiKey
 
 KEY_PREFIX = "loupe_sk_"
 _PREFIX_DISPLAY_LEN = len(KEY_PREFIX) + 6  # loupe_sk_ + 6 chars shown in the UI
+
+# How stale last_used_at may get before we re-stamp it. Stamping on *every*
+# ingest doubled the write/commit traffic on the hottest endpoint for a value
+# nobody needs to the second; once a minute is plenty for "recently used".
+_STAMP_INTERVAL = timedelta(minutes=1)
 
 
 def _hash(raw: str) -> str:
@@ -35,6 +40,11 @@ def verify_ingest_key(db: Session, raw: str) -> ApiKey | None:
         select(ApiKey).where(ApiKey.key_hash == _hash(raw), ApiKey.revoked_at.is_(None))
     ).first()
     if key is not None:
-        key.last_used_at = datetime.now(timezone.utc)
-        db.commit()
+        now = datetime.now(timezone.utc)
+        last = key.last_used_at
+        if last is not None and last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)  # SQLite stores naive UTC
+        if last is None or last < now - _STAMP_INTERVAL:
+            key.last_used_at = now
+            db.commit()
     return key
