@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { getStatus } from "../api/status";
+import Brand from "../components/Brand";
 import type { StatusComponent, StatusPage as StatusPageData } from "../types";
 
 const REFRESH_MS = 15000;
@@ -55,7 +56,7 @@ export default function StatusPage() {
   return (
     <div className="status-page">
       <header className="status-head">
-        <div className="brand">🔎 Loupe</div>
+        <Brand />
         <div className="status-subtitle">Service status</div>
       </header>
 

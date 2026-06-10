@@ -8,6 +8,7 @@ import { setWorkloadPublic } from "../api/status";
 import { listWorkloads } from "../api/workloads";
 import AlertsPanel from "../components/AlertsPanel";
 import ApiKeysPanel from "../components/ApiKeysPanel";
+import Brand from "../components/Brand";
 import CostBreakdown from "../components/CostBreakdown";
 import CostChart, { type CostPoint } from "../components/CostChart";
 import ErrorRateChart, { type ErrorPoint } from "../components/ErrorRateChart";
@@ -251,24 +252,7 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-          </span>
-          Loupe
-        </div>
+        <Brand />
         <div className="spacer" />
         <select
           aria-label="workload"
