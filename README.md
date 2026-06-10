@@ -79,6 +79,7 @@ automatically on first boot.
 - `GET  /metrics/timeseries?workload_id=&window=&bucket=` (auth) — bucketed latency/errors + tokens/cost
 - `GET  /metrics/cost?window=` (auth) — account-wide spend, broken down by model and workload
 - `GET  /alerts` (auth) — supports `?workload_id=` and `?resolved=` filters
+- `POST /alerts/{id}/resolve` · `POST /alerts/{id}/reopen` (auth) — manually resolve an alert (e.g. one whose workload went quiet) or undo that
 - `GET  /workloads/{id}/monitors` (auth) — every rule's effective config for a workload
 - `PUT  /workloads/{id}/monitors/{rule}` (auth) — enable/disable or override a rule's threshold
 - `POST /auth/stream-ticket` (auth) — exchange the admin token for a short-lived, read-only ticket for the live stream
