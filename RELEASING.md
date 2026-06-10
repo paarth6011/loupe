@@ -39,6 +39,30 @@ docker run -p 8000:8000 \
 > right for a local `docker run`. For a deployed frontend, rebuild with
 > `--build-arg VITE_API_URL=https://your-backend-url` (see `DEPLOYMENT.md`).
 
+## Deploying behind a reverse proxy
+
+The login brute-force throttle (`/auth/login`) keys on the client IP via
+`request.client.host`. With the default setup that's correct — the frontend
+nginx serves only static files, so browsers reach the backend directly and the
+IP is the real client.
+
+If you put the backend **behind a reverse proxy or load balancer** (nginx,
+Cloud Run, an ALB, etc.), every request appears to come from the proxy's IP
+instead. The throttle then counts all clients against one shared counter — so a
+single attacker can lock everyone out, and the per-IP limit is effectively
+meaningless. When (and only when) a trusted proxy sits in front, start uvicorn
+so it honors the forwarded client IP:
+
+```sh
+# backend/start.sh — add the proxy flags
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8080}" \
+     --proxy-headers --forwarded-allow-ips="*"
+```
+
+Do **not** enable `--forwarded-allow-ips` without a proxy in front: it would let
+any client spoof `X-Forwarded-For` and dodge the throttle. Narrow it to the
+proxy's address range in production rather than `"*"` where you can.
+
 ## One-time: finish the rename to `loupe`
 
 The code, dashboard, SDK, compose project, and image names are already `loupe`.
