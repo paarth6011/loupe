@@ -9,13 +9,15 @@ import {
   YAxis,
 } from "recharts";
 
+import { AXIS_PROPS, CHART, ChartTooltip, glow } from "./chartTheme";
+
 export interface LatencyPoint {
   time: string;
   p50: number | null;
   p95: number | null;
 }
 
-const TOOLTIP_STYLE = { background: "#0f1626", border: "1px solid #27324a" };
+const fmtMs = (v: number) => `${Math.round(v)}ms`;
 
 export default function LatencyChart({ data }: { data: LatencyPoint[] }) {
   return (
@@ -24,32 +26,36 @@ export default function LatencyChart({ data }: { data: LatencyPoint[] }) {
       <ResponsiveContainer width="100%" height={260}>
         <LineChart
           data={data}
-          margin={{ top: 8, right: 16, bottom: 0, left: -8 }}
+          margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#27324a" />
-          <XAxis
-            dataKey="time"
-            stroke="#7c8aa5"
-            fontSize={12}
-            minTickGap={32}
+          <CartesianGrid strokeDasharray="2 4" vertical={false} />
+          <XAxis dataKey="time" {...AXIS_PROPS} minTickGap={36} />
+          <YAxis {...AXIS_PROPS} width={58} tickFormatter={fmtMs} />
+          <Tooltip
+            cursor={{ stroke: "#3a4456" }}
+            content={<ChartTooltip format={fmtMs} />}
           />
-          <YAxis stroke="#7c8aa5" fontSize={12} unit="ms" />
-          <Tooltip contentStyle={TOOLTIP_STYLE} />
-          <Legend />
+          <Legend iconType="plainline" />
           <Line
             type="monotone"
             dataKey="p50"
             name="p50"
-            stroke="#4ade80"
+            stroke={CHART.p50}
+            strokeWidth={2}
             dot={false}
+            activeDot={{ r: 3, strokeWidth: 0 }}
+            style={glow(CHART.p50)}
             isAnimationActive={false}
           />
           <Line
             type="monotone"
             dataKey="p95"
             name="p95"
-            stroke="#f59e0b"
+            stroke={CHART.p95}
+            strokeWidth={2}
             dot={false}
+            activeDot={{ r: 3, strokeWidth: 0 }}
+            style={glow(CHART.p95)}
             isAnimationActive={false}
           />
         </LineChart>

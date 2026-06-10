@@ -8,12 +8,12 @@ import {
   YAxis,
 } from "recharts";
 
+import { AXIS_PROPS, CHART, ChartTooltip, glow } from "./chartTheme";
+
 export interface CostPoint {
   time: string;
   cost: number; // USD spent in this bucket
 }
-
-const TOOLTIP_STYLE = { background: "#0f1626", border: "1px solid #27324a" };
 
 function usd(value: number): string {
   if (value === 0) return "$0";
@@ -28,38 +28,35 @@ export default function CostChart({ data }: { data: CostPoint[] }) {
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart
           data={data}
-          margin={{ top: 8, right: 16, bottom: 0, left: 4 }}
+          margin={{ top: 8, right: 12, bottom: 0, left: 4 }}
         >
           <defs>
             <linearGradient id="costFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#5b8cff" stopOpacity={0.5} />
-              <stop offset="100%" stopColor="#5b8cff" stopOpacity={0} />
+              <stop offset="0%" stopColor={CHART.cost} stopOpacity={0.45} />
+              <stop offset="100%" stopColor={CHART.cost} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27324a" />
-          <XAxis
-            dataKey="time"
-            stroke="#7c8aa5"
-            fontSize={12}
-            minTickGap={32}
-          />
+          <CartesianGrid strokeDasharray="2 4" vertical={false} />
+          <XAxis dataKey="time" {...AXIS_PROPS} minTickGap={36} />
           <YAxis
-            stroke="#7c8aa5"
-            fontSize={12}
-            width={64}
+            {...AXIS_PROPS}
+            width={60}
             tickFormatter={usd}
             domain={[0, "auto"]}
           />
           <Tooltip
-            contentStyle={TOOLTIP_STYLE}
-            formatter={(v: number) => [usd(v), "cost"]}
+            cursor={{ stroke: "#3a4456" }}
+            content={<ChartTooltip format={usd} />}
           />
           <Area
             type="monotone"
             dataKey="cost"
             name="cost"
-            stroke="#5b8cff"
+            stroke={CHART.cost}
+            strokeWidth={2}
             fill="url(#costFill)"
+            activeDot={{ r: 3, strokeWidth: 0 }}
+            style={glow(CHART.cost)}
             isAnimationActive={false}
           />
         </AreaChart>

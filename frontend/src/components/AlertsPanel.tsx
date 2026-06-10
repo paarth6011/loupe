@@ -3,9 +3,13 @@ import type { Alert, Workload } from "../types";
 export default function AlertsPanel({
   alerts,
   workloads,
+  onResolve,
+  resolvingId,
 }: {
   alerts: Alert[];
   workloads: Workload[];
+  onResolve?: (alert: Alert) => void;
+  resolvingId?: number | null;
 }) {
   const nameOf = (id: number) =>
     workloads.find((w) => w.id === id)?.name ?? `workload #${id}`;
@@ -37,11 +41,23 @@ export default function AlertsPanel({
       </div>
       <div className="alert-msg">{a.message}</div>
       {a.summary ? <div className="alert-summary">{a.summary}</div> : null}
-      <div className="alert-meta">
-        {nameOf(a.workload_id)}
-        {a.resolved_at
-          ? ` · resolved ${new Date(a.resolved_at).toLocaleTimeString()}`
-          : null}
+      <div className="alert-foot">
+        <span className="alert-meta">
+          {nameOf(a.workload_id)}
+          {a.resolved_at
+            ? ` · resolved ${new Date(a.resolved_at).toLocaleTimeString()}`
+            : null}
+        </span>
+        {onResolve && !a.resolved_at ? (
+          <button
+            className="alert-resolve"
+            aria-label={`Resolve ${a.rule} alert for ${nameOf(a.workload_id)}`}
+            disabled={resolvingId === a.id}
+            onClick={() => onResolve(a)}
+          >
+            {resolvingId === a.id ? "Resolving…" : "Resolve"}
+          </button>
+        ) : null}
       </div>
     </li>
   );

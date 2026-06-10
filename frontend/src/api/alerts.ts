@@ -12,3 +12,11 @@ export function listAlerts(params?: {
   const qs = query.toString();
   return apiFetch<Alert[]>(`/alerts${qs ? `?${qs}` : ""}`);
 }
+
+export function resolveAlert(id: number): Promise<Alert> {
+  return apiFetch<Alert>(`/alerts/${id}/resolve`, { method: "POST" });
+}
+
+export function reopenAlert(id: number): Promise<Alert> {
+  return apiFetch<Alert>(`/alerts/${id}/reopen`, { method: "POST" });
+}
