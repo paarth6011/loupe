@@ -80,9 +80,7 @@ def test_dev_login_issues_admin_token_in_dev(client):
 def test_dev_login_disabled_in_production(client):
     from app.config import Settings, get_settings
 
-    app.dependency_overrides[get_settings] = lambda: Settings(
-        environment="production"
-    )
+    app.dependency_overrides[get_settings] = lambda: Settings(environment="production")
     try:
         assert client.post("/auth/dev-login").status_code == 404
     finally:
@@ -96,13 +94,9 @@ def test_login_throttles_after_repeated_failures(client):
     # Uses the fixture client (deterministic in-memory cache). Ten bad attempts
     # are 401; the next is refused with 429 regardless of the password.
     for _ in range(10):
-        bad = client.post(
-            "/auth/login", json={"username": "admin", "password": "nope"}
-        )
+        bad = client.post("/auth/login", json={"username": "admin", "password": "nope"})
         assert bad.status_code == 401
-    locked = client.post(
-        "/auth/login", json={"username": "admin", "password": "admin"}
-    )
+    locked = client.post("/auth/login", json={"username": "admin", "password": "admin"})
     assert locked.status_code == 429
 
 
@@ -112,7 +106,5 @@ def test_login_success_resets_failure_counter(client):
     ok = client.post("/auth/login", json={"username": "admin", "password": "admin"})
     assert ok.status_code == 200
     # Counter cleared, so a fresh run of failures starts from zero (still 401).
-    again = client.post(
-        "/auth/login", json={"username": "admin", "password": "nope"}
-    )
+    again = client.post("/auth/login", json={"username": "admin", "password": "nope"})
     assert again.status_code == 401

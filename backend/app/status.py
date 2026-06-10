@@ -44,18 +44,14 @@ def _component(db: Session, workload: Workload) -> StatusComponent:
     dialect = db.bind.dialect.name
 
     last_sample_at = db.scalar(
-        select(func.max(MetricSample.ts)).where(
-            MetricSample.workload_id == workload.id
-        )
+        select(func.max(MetricSample.ts)).where(MetricSample.workload_id == workload.id)
     )
 
     # Uptime over the last 24h: share of samples that were "ok".
     total, ok = db.execute(
         select(
             func.count(),
-            func.coalesce(
-                func.sum(case((MetricSample.status == "ok", 1), else_=0)), 0
-            ),
+            func.coalesce(func.sum(case((MetricSample.status == "ok", 1), else_=0)), 0),
         ).where(
             MetricSample.workload_id == workload.id,
             MetricSample.ts >= window_start(dialect, UPTIME_WINDOW),
@@ -81,9 +77,8 @@ def _component(db: Session, workload: Workload) -> StatusComponent:
             )
         ).all()
     )
-    is_stale = (
-        last_sample_at is None
-        or last_sample_at < window_start(dialect, STALE_AFTER)
+    is_stale = last_sample_at is None or last_sample_at < window_start(
+        dialect, STALE_AFTER
     )
 
     if "critical" in open_severities:

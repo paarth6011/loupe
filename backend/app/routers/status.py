@@ -17,9 +17,7 @@ def public_status(db: Session = Depends(get_db)) -> StatusPageOut:
     detail. Operators opt a workload in from the dashboard."""
     workloads = list(
         db.scalars(
-            select(Workload)
-            .where(Workload.public.is_(True))
-            .order_by(Workload.name)
+            select(Workload).where(Workload.public.is_(True)).order_by(Workload.name)
         ).all()
     )
     return build_status_page(db, workloads)

@@ -86,9 +86,7 @@ def _get_or_create_workload(db: Session, name: str, max_workloads: int) -> Workl
             db.add(workload)
             db.flush()
     except IntegrityError:
-        workload = db.scalars(
-            select(Workload).where(Workload.name == name)
-        ).first()
+        workload = db.scalars(select(Workload).where(Workload.name == name)).first()
         if workload is None:  # not the unique-name race — surface it
             raise
     return workload
