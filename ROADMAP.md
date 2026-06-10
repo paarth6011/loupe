@@ -86,8 +86,9 @@ contract is provider-agnostic, so the pivot below is mostly additive.
 - [x] Live updates via Server-Sent Events instead of polling: the dashboard
       opens a single `GET /events` stream and refetches only when the server
       signals a change (newest sample/alert id + open-alert count), with a slow
-      fallback interval as a safety net. Auth via a query-param JWT (EventSource
-      can't set headers); the connection self-recycles and the browser reconnects
+      fallback interval as a safety net. Because EventSource can't set headers,
+      auth uses a short-lived, read-only stream ticket (not the admin JWT) in the
+      query string; the connection self-recycles and the client reconnects
 - [ ] Keep the core cloud-agnostic; treat GCP/Terraform as one deploy example
 
 ## Explicitly out of scope (for now)
