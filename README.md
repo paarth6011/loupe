@@ -7,11 +7,10 @@ Self-hosted, runs for $0, no API key required.
 A loupe is the magnifier you use to inspect fine detail — this one shows you what
 every LLM call really costs.
 
-> **Status:** the core monitoring pipeline (ingest → aggregate → alert →
-> summarize → visualize) works today on real data, as described below. The
-> LLM-specific cost/token tracking and the instrumentation SDK are in progress —
-> see **[VISION.md](VISION.md)** for the finished picture and
-> **[ROADMAP.md](ROADMAP.md)** for the path.
+> **Status:** the full pipeline works today on real data — ingest → aggregate →
+> alert → summarize → visualize, including LLM cost/token tracking and the
+> two-line instrumentation SDK. See **[VISION.md](VISION.md)** for the vision and
+> **[ROADMAP.md](ROADMAP.md)** for what's next.
 
 ## Screenshots
 
@@ -26,8 +25,10 @@ cp .env.example .env        # optional — sensible defaults are baked in
 docker compose up --build   # brings up db + backend + frontend (empty instance)
 ```
 
-Then open **http://localhost:5173** and sign in with **admin / admin**. The
-instance starts empty — instrument an app with the [SDK](#instrument-your-llm-calls-sdk)
+Then open **http://localhost:5173**. In local dev you're signed in
+automatically — no login screen; a deployed instance (`ENVIRONMENT=production`)
+requires a real login and refuses to boot on the default password. The instance
+starts empty — instrument an app with the [SDK](#instrument-your-llm-calls-sdk)
 to fill it with your own data.
 
 **Want a live demo first?** Start the optional prober, which measures real public
@@ -80,7 +81,8 @@ automatically on first boot.
 - `GET  /alerts` (auth) — supports `?workload_id=` and `?resolved=` filters
 - `GET  /workloads/{id}/monitors` (auth) — every rule's effective config for a workload
 - `PUT  /workloads/{id}/monitors/{rule}` (auth) — enable/disable or override a rule's threshold
-- `GET  /events?token=<jwt>` — Server-Sent Events stream; pushes a `changed` event when new data lands so the dashboard refetches without fixed-interval polling
+- `POST /auth/stream-ticket` (auth) — exchange the admin token for a short-lived, read-only ticket for the live stream
+- `GET  /events?ticket=<ticket>` — Server-Sent Events stream; pushes a `changed` event when new data lands so the dashboard refetches without fixed-interval polling
 
 ## Tests
 
@@ -145,9 +147,11 @@ never exposes cost, tokens, or alert detail. Workloads are opt-in: flip the
 **Live updates:** the dashboard subscribes to a single `GET /events`
 Server-Sent Events stream and refetches only when the server signals new data
 (it watches the newest sample/alert id and the open-alert count), instead of
-blindly polling. The JWT is passed as a `token` query param since `EventSource`
-can't set headers; each connection self-recycles every few minutes and the
-browser reconnects, with a slow client-side interval as a safety net.
+blindly polling. Because `EventSource` can't send an `Authorization` header, the
+dashboard first exchanges its token for a short-lived, read-only **stream
+ticket** and passes that in the query string — so the full admin token never
+lands in a URL or proxy log. Each connection self-recycles every few minutes and
+the client reconnects with a fresh ticket.
 
 **Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
 webhook to get pinged when an alert fires or resolves. The payload includes

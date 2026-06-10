@@ -6,7 +6,7 @@ All notable changes to Loupe are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.1.0] — first public release
+## [0.1.0] — 2026-06-10
 
 The initial open-source release: **observability for LLM apps** — track latency,
 tokens, and cost per call, with explainable alerts, plain-English incident
@@ -33,6 +33,11 @@ summaries, and a live dashboard. Self-hosted, runs for $0, no API key required.
   over **Server-Sent Events** (no more fixed-interval polling), and a public,
   no-auth **status page** (`/status`) showing the health of workloads you opt in
   to publishing — never their cost or alert detail.
+- **Security & access** — brute-force throttle on login; the live stream
+  authenticates with a short-lived, scope-separated **stream ticket** so the
+  admin token never travels in a URL; frictionless **auto-login in local dev**
+  while production keeps a mandatory login. Concurrency-safe alert/workload
+  writes (DB-enforced) and an ingest hot path trimmed to a couple of queries.
 - **Scale & operations** — aggregation pushed into SQL (`COUNT`/`SUM`/`GROUP BY`,
   Postgres `percentile_cont`); configurable **data retention** with a background
   sweep and `POST /admin/prune`; Redis-cached summaries; JWT auth that refuses to
@@ -41,5 +46,5 @@ summaries, and a live dashboard. Self-hosted, runs for $0, no API key required.
   backend and frontend, Terraform for an optional GCP (Cloud Run) deploy, and CI
   (lint + tests + build) on every PR.
 
-[Unreleased]: https://github.com/OWNER/loupe/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/OWNER/loupe/releases/tag/v0.1.0
+[Unreleased]: https://github.com/paarth6011/loupe/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/paarth6011/loupe/releases/tag/v0.1.0
