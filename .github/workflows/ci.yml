@@ -54,3 +54,21 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+
+  # Single required check for branch protection. Depends on every job above, so
+  # the ruleset only ever needs to require "ci-success" — add/rename jobs freely
+  # without touching branch protection. `if: always()` ensures this runs even
+  # when a dependency fails, so a failure is reported (not skipped).
+  ci-success:
+    name: ci-success
+    runs-on: ubuntu-latest
+    needs: [backend, sdk, frontend]
+    if: always()
+    steps:
+      - name: Verify all required jobs passed
+        run: |
+          if echo '${{ join(needs.*.result, ' ') }}' | grep -qvE '^success( success)*$'; then
+            echo "One or more required jobs did not succeed: ${{ join(needs.*.result, ', ') }}"
+            exit 1
+          fi
+          echo "All required jobs passed."
