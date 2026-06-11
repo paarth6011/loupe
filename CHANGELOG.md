@@ -6,6 +6,30 @@ All notable changes to Loupe are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-06-11
+
+A visual overhaul and manual alert control, plus project polish.
+
+### Added
+
+- **Manual alert resolution** — `POST /alerts/{id}/resolve` and
+  `POST /alerts/{id}/reopen`, surfaced as a one-click **Resolve** button with a
+  6-second **Undo** toast in the dashboard. This handles alerts whose workload
+  went quiet and so would never auto-resolve on the next ingest. Reopening is
+  guarded by the one-open-alert-per-rule constraint (409 on conflict).
+- **Project & contributor tooling** — Dependabot (weekly grouped updates for
+  GitHub Actions, the backend/SDK, and the frontend), issue forms (bug / feature)
+  and a pull-request template, and a `ci-success` gate job so branch protection
+  needs a single required check.
+
+### Changed
+
+- **Dashboard visual overhaul** — a token-based dark/OLED design system: Inter +
+  JetBrains Mono (tabular figures for data columns), a unified color/spacing
+  scale, SVG icons (no emoji), a shared brand mark and **favicon**, and restyled
+  charts (glow lines, gradient fills, custom dark tooltips). The README now leads
+  with an animated demo.
+
 ## [0.1.0] — 2026-06-10
 
 The initial open-source release: **observability for LLM apps** — track latency,
@@ -46,5 +70,6 @@ summaries, and a live dashboard. Self-hosted, runs for $0, no API key required.
   backend and frontend, Terraform for an optional GCP (Cloud Run) deploy, and CI
   (lint + tests + build) on every PR.
 
-[Unreleased]: https://github.com/paarth6011/loupe/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/paarth6011/loupe/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/paarth6011/loupe/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paarth6011/loupe/releases/tag/v0.1.0
