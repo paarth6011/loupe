@@ -1,12 +1,18 @@
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.config import get_settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _settings = get_settings()
+
+
+def _bcrypt_bytes(plain: str) -> bytes:
+    # bcrypt only considers the first 72 bytes of a password; encode and truncate
+    # to that limit so longer secrets hash without raising.
+    return plain.encode("utf-8")[:72]
+
 
 # A stream ticket is a narrow, short-lived credential for the SSE endpoint.
 # Because EventSource can't set headers, it must travel in the URL query string,
@@ -18,11 +24,13 @@ _STREAM_TICKET_TTL_SECONDS = 60
 
 # The single-role MVP admin password is supplied as plaintext via env; hash it
 # once at import so credential checks go through bcrypt verification.
-_ADMIN_PASSWORD_HASH = pwd_context.hash(_settings.admin_password)
+_ADMIN_PASSWORD_HASH = bcrypt.hashpw(
+    _bcrypt_bytes(_settings.admin_password), bcrypt.gensalt()
+).decode("ascii")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(_bcrypt_bytes(plain), hashed.encode("ascii"))
 
 
 def authenticate(username: str, password: str) -> bool:
