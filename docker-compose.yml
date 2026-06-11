@@ -51,6 +51,8 @@ services:
       # reaches an Ollama running on the host (mapped below for Linux too).
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      # Optional Slack/Discord/generic webhook pinged when an alert fires/resolves.
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
