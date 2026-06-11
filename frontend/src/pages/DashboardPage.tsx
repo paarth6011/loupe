@@ -58,7 +58,13 @@ function Icon({ path }: { path: string }) {
   );
 }
 
-export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
+export default function DashboardPage({
+  onLogout,
+  showLogout = true,
+}: {
+  onLogout: () => void;
+  showLogout?: boolean;
+}) {
   const [workloads, setWorkloads] = useState<Workload[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [timeWindow, setTimeWindow] = useState("1h");
@@ -306,7 +312,7 @@ export default function DashboardPage({ onLogout }: { onLogout: () => void }) {
           <Icon path="M2 18v3h3l8.5-8.5M21 7.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
           API keys
         </button>
-        <button onClick={onLogout}>Log out</button>
+        {showLogout ? <button onClick={onLogout}>Log out</button> : null}
       </header>
 
       {showMonitors && selected ? (
