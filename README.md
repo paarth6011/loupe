@@ -1,5 +1,9 @@
 # 🔎 Loupe
 
+[![CI](https://github.com/paarth6011/loupe/actions/workflows/ci.yml/badge.svg)](https://github.com/paarth6011/loupe/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/paarth6011/loupe)](https://github.com/paarth6011/loupe/releases)
+[![License: MIT](https://img.shields.io/github/license/paarth6011/loupe)](LICENSE)
+
 **Open-source observability for LLM apps** — track the latency, tokens, and cost
 of your AI calls, with explainable alerts and plain-English incident summaries.
 Self-hosted, runs for $0, no API key required.
