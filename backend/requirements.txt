@@ -10,7 +10,7 @@ passlib==1.7.4
 # Pinned: passlib 1.7.4 is incompatible with bcrypt >= 4.1 (backend self-test crash).
 bcrypt==4.0.1
 python-multipart==0.0.20
-redis==5.2.1
+redis==8.0.0
 anthropic==0.40.0
 # Used at runtime for the local-Ollama summarizer (and by the test client).
 httpx==0.28.1
