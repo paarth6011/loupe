@@ -5,6 +5,14 @@ current provider pricing. It's used to compute `cost_usd` from token counts when
 a client doesn't supply an explicit cost.
 """
 
+import re
+
+# Providers echo back the dated snapshot they actually served (e.g.
+# "claude-haiku-4-5-20251001"), but the table is keyed by the stable alias. Strip
+# a trailing "-YYYYMMDD" so snapshots resolve to their family's price without
+# having to add a new key every time a snapshot ships.
+_DATE_SUFFIX = re.compile(r"-\d{8}$")
+
 # model -> (input_usd_per_1m, output_usd_per_1m)
 PRICING: dict[str, tuple[float, float]] = {
     # Anthropic
@@ -30,7 +38,9 @@ def compute_cost(
     unknown (so we never invent a number we can't justify)."""
     if not model:
         return None
-    price = PRICING.get(model)
+    # Try the exact id first, then fall back to the alias with any dated
+    # snapshot suffix removed.
+    price = PRICING.get(model) or PRICING.get(_DATE_SUFFIX.sub("", model))
     if price is None:
         return None
     in_rate, out_rate = price
