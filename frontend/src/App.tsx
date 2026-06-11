@@ -19,17 +19,26 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>(() =>
     getToken() ? "authed" : "checking",
   );
+  // Whether this is a dev box (where /auth/dev-login succeeds and login is
+  // skipped). In dev there is nothing to log out of, so the dashboard hides its
+  // "Log out" button. Stays false in production, where login is real.
+  const [devMode, setDevMode] = useState(false);
 
   useEffect(() => {
-    if (isStatus || phase !== "checking") return;
+    if (isStatus) return;
     let cancelled = false;
+    // Probe dev-login on mount: it both decides whether to skip the sign-in
+    // form (when we have no token yet) and tells us if this is a dev box. In
+    // dev it returns a token; in production it 404s and we fall through.
     devLogin().then((ok) => {
-      if (!cancelled) setPhase(ok ? "authed" : "login");
+      if (cancelled) return;
+      setDevMode(ok);
+      setPhase((p) => (p === "checking" ? (ok ? "authed" : "login") : p));
     });
     return () => {
       cancelled = true;
     };
-  }, [isStatus, phase]);
+  }, [isStatus]);
 
   if (isStatus) return <StatusPage />;
 
@@ -47,6 +56,9 @@ export default function App() {
 
   return (
     <DashboardPage
+      // Dev boxes skip login entirely, so there's nothing to log out of — hide
+      // the button there and only show it on a real (production) login.
+      showLogout={!devMode}
       onLogout={() => {
         clearToken();
         // Show the sign-in form on explicit logout rather than silently
