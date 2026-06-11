@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned-major versions fresh (e.g. checkout/setup-* bumps).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Backend (FastAPI) — requirements.txt
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      backend:
+        update-types: [minor, patch]
+
+  # Python SDK — pyproject.toml
+  - package-ecosystem: pip
+    directory: /sdk
+    schedule:
+      interval: weekly
+    groups:
+      sdk:
+        update-types: [minor, patch]
+
+  # Frontend (React + Vite) — package-lock.json
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      frontend:
+        update-types: [minor, patch]
