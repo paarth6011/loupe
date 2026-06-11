@@ -29,6 +29,32 @@ every LLM call really costs.
 
 </details>
 
+## Who Loupe is for
+
+**Loupe is for developers and teams running LLM-powered apps** — a chatbot on
+your site, a summarizer, an agent, anything whose *code* calls Claude, GPT, or a
+local model through an API. If you have an **API key** and an app making calls,
+Loupe wraps your client and watches those calls: latency, tokens, cost, errors,
+and alerts.
+
+**It is *not* for using Claude or ChatGPT as a chat product.** A consumer
+subscription (Claude Pro/Max, ChatGPT Plus) lets you *type into an assistant* —
+there's no code, no API key, and no running service to observe. In that case
+you're the end user of someone else's app; *that someone* is who Loupe is for.
+
+The dividing line is **building an app vs. using a chatbot**, not how you're
+billed:
+
+| You are… | API key? | Loupe fit |
+|---|---|---|
+| A dev on pay-as-you-go API | yes | ✅ wraps your client, observes every call |
+| A team on a committed/enterprise API contract | yes | ✅ same — the billing model doesn't matter, the telemetry is identical |
+| Someone with only a Pro/Plus subscription, no API key | no | ❌ nothing to instrument — you're not running an app |
+
+And it isn't only about cost: even on a flat bill, Loupe answers *"is my app
+slow? is it failing? did that 3am deploy break it?"* — but all of that needs a
+running app making API calls to measure.
+
 ## Quickstart
 
 ```bash
