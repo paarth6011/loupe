@@ -12,11 +12,18 @@ every LLM call really costs.
 > two-line instrumentation SDK. See **[VISION.md](VISION.md)** for the vision and
 > **[ROADMAP.md](ROADMAP.md)** for what's next.
 
-## Screenshots
+## Demo
+
+![Loupe walkthrough — dashboard, cost breakdown, per-workload monitors, one-click alert resolve, and the public status page](docs/demo.gif)
+
+<details>
+<summary>Individual screenshots</summary>
 
 | Dashboard (latency · tokens · cost · alerts) | Public status page |
 |---|---|
 | ![Loupe dashboard](docs/screenshots/dashboard.png) | ![Loupe status page](docs/screenshots/status-page.png) |
+
+</details>
 
 ## Quickstart
 
