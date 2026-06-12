@@ -4,3 +4,8 @@ target-version = "py312"
 [lint]
 # pycodestyle errors, pyflakes, import sorting
 select = ["E", "F", "I"]
+
+[lint.per-file-ignores]
+# conftest must set ENVIRONMENT=dev *before* importing the app (which now fails
+# closed under prod defaults), so imports legitimately follow a statement.
+"tests/conftest.py" = ["E402", "I001"]

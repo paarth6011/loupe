@@ -12,8 +12,12 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # "dev" (default) allows insecure defaults; "prod"/"production" refuses them.
-    environment: str = "dev"
+    # Secure by default: "prod" refuses insecure defaults at boot. Opt into the
+    # convenient-but-insecure dev mode explicitly (ENVIRONMENT=dev) — the local
+    # Compose stack and the test suite do exactly that. A deployment that simply
+    # forgets to set this therefore fails closed instead of silently enabling
+    # dev-login and accepting the placeholder JWT secret.
+    environment: str = "prod"
 
     # Database
     database_url: str = "postgresql+psycopg://cloudops:cloudops@db:5432/cloudops"

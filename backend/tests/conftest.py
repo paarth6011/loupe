@@ -1,3 +1,11 @@
+import os
+
+# The app now defaults to ENVIRONMENT=prod and refuses to import under the
+# insecure defaults the suite relies on (admin/admin, placeholder JWT secret).
+# Declare the test run as dev *before* importing anything from `app`. setdefault
+# lets CI override it explicitly if it wants.
+os.environ.setdefault("ENVIRONMENT", "dev")
+
 from collections.abc import Iterator
 
 import pytest

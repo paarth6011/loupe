@@ -53,9 +53,12 @@ putting Loupe on any reachable network:
 - **Rotate ingestion keys.** Revoke keys you no longer use from the dashboard,
   and never commit them.
 
-> **Enforced:** with `ENVIRONMENT=production`, the backend refuses to start while
-> `JWT_SECRET` or `ADMIN_PASSWORD` is an insecure default. Local dev
-> (`ENVIRONMENT=dev`, the default) allows them but logs a warning.
+> **Enforced (secure by default):** `ENVIRONMENT` defaults to `production`, so the
+> backend refuses to start while `JWT_SECRET` or `ADMIN_PASSWORD` is an insecure
+> default — a deployment that forgets to configure it fails closed. You must opt
+> into the permissive local-dev behavior explicitly with `ENVIRONMENT=dev`, which
+> allows the insecure defaults (and logs a warning). The Compose stack and the
+> test suite set `ENVIRONMENT=dev` for you.
 
 ## Reporting a vulnerability
 
