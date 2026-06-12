@@ -76,6 +76,28 @@ seconds:
 docker compose --profile demo up -d   # adds the prober (canned demo data)
 ```
 
+## Deploy (self-host, $0)
+
+Run the **whole stack on one VM** — backend, Postgres, Redis, frontend — behind
+[Caddy](https://caddyserver.com) with automatic HTTPS, on a free
+[DuckDNS](https://www.duckdns.org) subdomain. Frontend at `/` and API at `/api`
+share one host, so they're **same-origin (no CORS)**, and the cert is issued
+automatically on first boot.
+
+```bash
+cp .env.prod.example .env   # set PUBLIC_URL/PUBLIC_DOMAIN + strong secrets
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Step-by-step walkthroughs on an always-free VM (no domain to buy):
+
+- **[DEPLOY-gcp.md](DEPLOY-gcp.md)** — Google Cloud `e2-micro` (always free)
+- **[DEPLOY-oracle.md](DEPLOY-oracle.md)** — Oracle Cloud Ampere ARM (always free)
+
+The prod backend runs with `ENVIRONMENT=production`, which **requires a real
+login and refuses to boot on default secrets** — so set `JWT_SECRET` and
+`ADMIN_PASSWORD` in `.env` before launching.
+
 ## Instrument your LLM calls (SDK)
 
 The [`loupe` Python SDK](sdk/) wraps your Anthropic/OpenAI client so each call's

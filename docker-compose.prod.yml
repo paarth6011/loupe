@@ -1,0 +1,92 @@
+# Production single-host stack: backend + Postgres + Redis + frontend, all behind
+# Caddy (which terminates HTTPS with an automatic Let's Encrypt cert). Designed
+# for one VM (e.g. an Oracle Always Free instance) — see DEPLOY-oracle.md.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Only Caddy is exposed to the internet (80/443); everything else talks over the
+# private compose network. The frontend is served at / and the API at /api on the
+# SAME host, so the dashboard and API are same-origin (no CORS needed).
+name: loupe
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cloudops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-cloudops}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cloudops}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    # Image default is `sh start.sh`: runs migrations when RUN_MIGRATIONS=1, then
+    # serves uvicorn on $PORT (8080). Safe to migrate-on-start for a single instance.
+    environment:
+      ENVIRONMENT: production
+      RUN_MIGRATIONS: "1"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-cloudops}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cloudops}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set a strong JWT_SECRET in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set a strong ADMIN_PASSWORD in .env}
+      # Same-origin, but set it explicitly for correctness.
+      CORS_ORIGINS: ${PUBLIC_URL}
+      SUMMARY_PROVIDER: ${SUMMARY_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SUMMARY_MODEL: ${SUMMARY_MODEL:-claude-haiku-4-5}
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Vite bakes this at build time. The SPA calls the API under /api on the
+        # same public host → same-origin, no CORS. Change PUBLIC_URL ⇒ rebuild.
+        VITE_API_URL: ${PUBLIC_URL}/api
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN (your duckdns host) in .env}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # persisted certs — don't lose this or you re-issue every restart
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
