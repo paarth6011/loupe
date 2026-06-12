@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import ceil
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -126,6 +126,17 @@ def ingest_metric(
         error_type=body.error_type,
     )
     if body.ts is not None:
+        # Reject far-future timestamps: a client must not be able to push samples
+        # past the retention cutoff or fabricate not-yet-happened history. Naive
+        # timestamps are treated as UTC (consistent with how they're stored).
+        skew = settings.ingest_max_future_skew_seconds
+        if skew > 0:
+            ts = body.ts if body.ts.tzinfo else body.ts.replace(tzinfo=timezone.utc)
+            if ts > datetime.now(timezone.utc) + timedelta(seconds=skew):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="ts is too far in the future",
+                )
         sample.ts = body.ts
     db.add(sample)
     db.flush()  # assign id + server-default ts and make it visible to threshold queries

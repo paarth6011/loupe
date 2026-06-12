@@ -102,3 +102,31 @@ def test_ingest_rejects_invalid_status(client, auth_headers):
     """Failure path: status outside the allowed literal is a 422."""
     resp = _post_metric(client, auth_headers, status="weird")
     assert resp.status_code == 422
+
+
+def test_ingest_rejects_far_future_timestamp(client, auth_headers):
+    """A client must not be able to forward-date samples past the retention
+    cutoff or fabricate future history; a far-future ts is a 422."""
+    from datetime import datetime, timedelta, timezone
+
+    future = (datetime.now(timezone.utc) + timedelta(days=3650)).isoformat()
+    resp = _post_metric(client, auth_headers, ts=future)
+    assert resp.status_code == 422
+
+
+def test_ingest_allows_small_clock_skew(client, auth_headers):
+    """A timestamp a little ahead of the server (ordinary clock drift) is fine."""
+    from datetime import datetime, timedelta, timezone
+
+    soon = (datetime.now(timezone.utc) + timedelta(seconds=30)).isoformat()
+    resp = _post_metric(client, auth_headers, ts=soon)
+    assert resp.status_code == 201
+
+
+def test_ingest_allows_backfilled_past_timestamp(client, auth_headers):
+    """Legitimate backfill of historical data (a past ts) is still accepted."""
+    from datetime import datetime, timedelta, timezone
+
+    past = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+    resp = _post_metric(client, auth_headers, ts=past)
+    assert resp.status_code == 201
