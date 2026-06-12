@@ -52,6 +52,11 @@ putting Loupe on any reachable network:
   See [RELEASING.md](RELEASING.md) for details.
 - **Rotate ingestion keys.** Revoke keys you no longer use from the dashboard,
   and never commit them.
+- **Terraform state holds secrets.** The state stores the generated JWT signing
+  key and DB password, plus the admin password, in plaintext. Anyone who can
+  read it can forge admin tokens. Use an encrypted, access-controlled remote
+  backend (see the commented example in `infra/terraform/versions.tf`); state
+  files are already git-ignored.
 
 > **Enforced (secure by default):** `ENVIRONMENT` defaults to `production`, so the
 > backend refuses to start while `JWT_SECRET` or `ADMIN_PASSWORD` is an insecure
@@ -59,6 +64,20 @@ putting Loupe on any reachable network:
 > into the permissive local-dev behavior explicitly with `ENVIRONMENT=dev`, which
 > allows the insecure defaults (and logs a warning). The Compose stack and the
 > test suite set `ENVIRONMENT=dev` for you.
+
+## Known limitations (accepted risks)
+
+These are conscious trade-offs for the current single-admin MVP, not oversights:
+
+- **Session tokens are stateless and browser-stored.** The admin JWT is held in
+  `localStorage` and carried in the `Authorization` header (so there is no CSRF
+  surface). It is a stateless token with a fixed TTL
+  (`ACCESS_TOKEN_EXPIRE_MINUTES`, default 60) and **no server-side revocation** —
+  "log out" only clears the browser copy, and rotating the password does not
+  invalidate already-issued tokens. Consequences to be aware of: a leaked token
+  is valid until it expires, and any future XSS in the dashboard would be enough
+  to exfiltrate it and take over the session. Keep the TTL short, and treat XSS
+  in the frontend as high severity. A token denylist / `jti` is future work.
 
 ## Reporting a vulnerability
 
