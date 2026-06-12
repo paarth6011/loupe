@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     # 0 disables the cap.
     max_workloads: int = 1000
 
+    # Reject ingest samples whose client-supplied `ts` is further than this many
+    # seconds in the future. An unbounded future timestamp lets a holder of an
+    # ingest key push samples past the retention cutoff (so they're never pruned)
+    # or fabricate not-yet-happened history. A small window absorbs ordinary
+    # clock drift between the source and the server. 0 disables the check.
+    ingest_max_future_skew_seconds: int = 300
+
     # Alerting thresholds (evaluated on ingest)
     latency_threshold_ms: int = 1000
     error_rate_threshold: float = 0.5  # fraction of recent samples that are errors
