@@ -55,9 +55,7 @@ def _provision_supabase_user(db: Session, claims: dict) -> User | None:
 
 
 def _default_account_id(db: Session) -> int | None:
-    return db.scalar(
-        select(Account.id).where(Account.name == DEFAULT_ACCOUNT_NAME)
-    )
+    return db.scalar(select(Account.id).where(Account.name == DEFAULT_ACCOUNT_NAME))
 
 
 def _resolve_bearer(db: Session, token: str) -> CurrentUser | None:

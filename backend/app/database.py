@@ -45,8 +45,11 @@ def set_current_account(db: Session, account_id: int) -> None:
     cleared by that commit, leaving the follow-up queries unpinned. The value is
     reset on connection checkin (above). No-op off Postgres — the SQLite test DB
     has no RLS and relies on the explicit ``account_id`` filters in app code.
+
+    Keyed off the *session's* bind, not the app engine: the test suite runs a
+    SQLite session even though the app's default engine is Postgres.
     """
-    if not _IS_POSTGRES:
+    if db.bind is None or db.bind.dialect.name != "postgresql":
         return
     db.execute(
         text("SELECT set_config('app.current_account', :account_id, false)"),

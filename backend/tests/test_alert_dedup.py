@@ -8,40 +8,44 @@ from app import alerting
 from app.models import Alert, Workload
 
 
-def _wl(db, name="dedup-wl"):
-    wl = Workload(name=name)
+def _wl(db, account_id, name="dedup-wl"):
+    wl = Workload(account_id=account_id, name=name)
     db.add(wl)
     db.flush()
     return wl
 
 
-def _open_alert(workload_id, rule="high_latency", message="m"):
+def _open_alert(account_id, workload_id, rule="high_latency", message="m"):
     return Alert(
-        workload_id=workload_id, rule=rule, message=message, severity="warning"
+        account_id=account_id,
+        workload_id=workload_id,
+        rule=rule,
+        message=message,
+        severity="warning",
     )
 
 
-def test_partial_unique_index_blocks_duplicate_open_alerts(db_session):
-    wl = _wl(db_session)
-    db_session.add(_open_alert(wl.id))
+def test_partial_unique_index_blocks_duplicate_open_alerts(db_session, account_id):
+    wl = _wl(db_session, account_id)
+    db_session.add(_open_alert(account_id, wl.id))
     db_session.commit()
 
-    db_session.add(_open_alert(wl.id, message="dup"))
+    db_session.add(_open_alert(account_id, wl.id, message="dup"))
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
 
 
-def test_resolved_alert_does_not_block_a_new_one(db_session):
-    wl = _wl(db_session)
-    first = _open_alert(wl.id)
+def test_resolved_alert_does_not_block_a_new_one(db_session, account_id):
+    wl = _wl(db_session, account_id)
+    first = _open_alert(account_id, wl.id)
     db_session.add(first)
     db_session.flush()
     # Resolve it, then a brand-new open alert for the same (workload, rule) is OK.
     from datetime import datetime, timezone
 
     first.resolved_at = datetime.now(timezone.utc)
-    db_session.add(_open_alert(wl.id, message="second"))
+    db_session.add(_open_alert(account_id, wl.id, message="second"))
     db_session.commit()  # must not raise
 
     open_count = (
@@ -52,11 +56,11 @@ def test_resolved_alert_does_not_block_a_new_one(db_session):
     assert open_count == 1
 
 
-def test_reconcile_tolerates_lost_race(db_session):
+def test_reconcile_tolerates_lost_race(db_session, account_id):
     """If a concurrent ingest opened the alert first (so our insert collides),
     _reconcile drops the duplicate without raising or recording it as opened."""
-    wl = _wl(db_session)
-    db_session.add(_open_alert(wl.id))  # the "winner"
+    wl = _wl(db_session, account_id)
+    db_session.add(_open_alert(account_id, wl.id))  # the "winner"
     # flush (not commit) keeps the ingest-style transaction active, exactly as in
     # production where the sample is flushed before reconcile runs.
     db_session.flush()
@@ -68,6 +72,7 @@ def test_reconcile_tolerates_lost_race(db_session):
     alerting._reconcile(
         db_session,
         {},
+        account_id,
         wl.id,
         "high_latency",
         True,

@@ -36,30 +36,37 @@ class _FakeRequest:
         return self._polls > self._connected_polls
 
 
-def _seed_sample(db_engine) -> sessionmaker:
+def _seed_sample(db_engine, account_id) -> sessionmaker:
     factory = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     with factory() as db:
-        wl = Workload(name="sse-wl")
+        wl = Workload(account_id=account_id, name="sse-wl")
         db.add(wl)
         db.flush()
-        db.add(MetricSample(workload_id=wl.id, latency_ms=50, status="ok"))
+        db.add(
+            MetricSample(
+                account_id=account_id,
+                workload_id=wl.id,
+                latency_ms=50,
+                status="ok",
+            )
+        )
         db.commit()
     return factory
 
 
-def test_read_fingerprint_reflects_state(db_engine):
-    factory = _seed_sample(db_engine)
+def test_read_fingerprint_reflects_state(db_engine, account_id):
+    factory = _seed_sample(db_engine, account_id)
     sample_max, alert_max, open_alerts = events._read_fingerprint(factory)
     assert sample_max >= 1
     assert alert_max == 0  # no alerts seeded
     assert open_alerts == 0
 
 
-def test_event_stream_emits_changed(db_engine, monkeypatch):
+def test_event_stream_emits_changed(db_engine, account_id, monkeypatch):
     # Drive the async generator directly (the TestClient can't cleanly tear down
     # a long-lived SSE stream). No real sleeping between polls.
     monkeypatch.setattr(events, "_POLL_SECONDS", 0)
-    factory = _seed_sample(db_engine)
+    factory = _seed_sample(db_engine, account_id)
     request = _FakeRequest(connected_polls=1)
 
     async def collect() -> list[str]:

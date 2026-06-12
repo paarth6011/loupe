@@ -81,12 +81,13 @@ def test_ingest_populates_alert_summary(client, auth_headers):
     assert alerts[0]["summary"] == "[summary] sum-wl/high_latency"
 
 
-def test_generate_summary_swallows_summarizer_errors(db_session):
+def test_generate_summary_swallows_summarizer_errors(db_session, account_id):
     """Failure path: a summarizer error leaves Alert.summary NULL, no raise."""
-    workload = Workload(name="boom-wl")
+    workload = Workload(account_id=account_id, name="boom-wl")
     db_session.add(workload)
     db_session.commit()
     alert = Alert(
+        account_id=account_id,
         workload_id=workload.id,
         rule="high_latency",
         message="m",

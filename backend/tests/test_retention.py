@@ -4,19 +4,28 @@ from app.models import Alert, MetricSample, Workload
 from app.retention import prune_old_data
 
 
-def _seed(session_factory, *, old_days: int, fresh: int, old: int):
+def _seed(session_factory, account_id, *, old_days: int, fresh: int, old: int):
     """Create a workload with `fresh` recent samples and `old` samples aged
     `old_days` back, plus one resolved-long-ago alert and one recent alert."""
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     with session_factory() as db:
-        wl = Workload(name="ret-wl")
+        wl = Workload(account_id=account_id, name="ret-wl")
         db.add(wl)
         db.flush()
         for _ in range(fresh):
-            db.add(MetricSample(workload_id=wl.id, latency_ms=50, status="ok", ts=now))
+            db.add(
+                MetricSample(
+                    account_id=account_id,
+                    workload_id=wl.id,
+                    latency_ms=50,
+                    status="ok",
+                    ts=now,
+                )
+            )
         for _ in range(old):
             db.add(
                 MetricSample(
+                    account_id=account_id,
                     workload_id=wl.id,
                     latency_ms=50,
                     status="ok",
@@ -25,6 +34,7 @@ def _seed(session_factory, *, old_days: int, fresh: int, old: int):
             )
         db.add(
             Alert(
+                account_id=account_id,
                 workload_id=wl.id,
                 rule="high_latency",
                 message="m",
@@ -35,6 +45,7 @@ def _seed(session_factory, *, old_days: int, fresh: int, old: int):
         )
         db.add(
             Alert(
+                account_id=account_id,
                 workload_id=wl.id,
                 rule="high_latency",
                 message="m",
@@ -47,11 +58,11 @@ def _seed(session_factory, *, old_days: int, fresh: int, old: int):
         return wl.id
 
 
-def test_prune_removes_only_old_rows(db_engine):
+def test_prune_removes_only_old_rows(db_engine, account_id):
     from sqlalchemy.orm import sessionmaker
 
     factory = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
-    _seed(factory, old_days=30, fresh=3, old=4)
+    _seed(factory, account_id, old_days=30, fresh=3, old=4)
 
     result = prune_old_data(factory, days=7)
     assert result.samples_deleted == 4  # only the 30-day-old samples
@@ -65,11 +76,11 @@ def test_prune_removes_only_old_rows(db_engine):
         assert remaining[0].resolved_at is None
 
 
-def test_prune_disabled_is_noop(db_engine):
+def test_prune_disabled_is_noop(db_engine, account_id):
     from sqlalchemy.orm import sessionmaker
 
     factory = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
-    _seed(factory, old_days=30, fresh=2, old=2)
+    _seed(factory, account_id, old_days=30, fresh=2, old=2)
     result = prune_old_data(factory, days=0)
     assert result.samples_deleted == 0
     with factory() as db:

@@ -43,16 +43,25 @@ def test_status_only_shows_published_workloads(client, auth_headers):
     assert comp["latency_p50_ms"] == 50
 
 
-def test_status_reflects_open_critical_alert(client, auth_headers, db_session):
+def test_status_reflects_open_critical_alert(
+    client, auth_headers, db_session, account_id
+):
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    wl = Workload(name="down-svc", public=True)
+    wl = Workload(account_id=account_id, name="down-svc", public=True)
     db_session.add(wl)
     db_session.flush()
     db_session.add(
-        MetricSample(workload_id=wl.id, latency_ms=50, status="error", ts=now)
+        MetricSample(
+            account_id=account_id,
+            workload_id=wl.id,
+            latency_ms=50,
+            status="error",
+            ts=now,
+        )
     )
     db_session.add(
         Alert(
+            account_id=account_id,
             workload_id=wl.id,
             rule="high_latency",
             message="m",
@@ -69,9 +78,9 @@ def test_status_reflects_open_critical_alert(client, auth_headers, db_session):
     assert body["overall"] == "down"
 
 
-def test_status_unknown_when_stale(client, auth_headers, db_session):
+def test_status_unknown_when_stale(client, auth_headers, db_session, account_id):
     # A published workload with no recent samples is "unknown", not operational.
-    wl = Workload(name="stale-svc", public=True)
+    wl = Workload(account_id=account_id, name="stale-svc", public=True)
     db_session.add(wl)
     db_session.commit()
 

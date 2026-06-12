@@ -28,9 +28,7 @@ class Account(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    plan: Mapped[str] = mapped_column(
-        String(32), nullable=False, server_default="free"
-    )
+    plan: Mapped[str] = mapped_column(String(32), nullable=False, server_default="free")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
