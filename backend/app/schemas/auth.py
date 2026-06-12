@@ -18,4 +18,11 @@ class StreamTicketResponse(BaseModel):
 
 
 class CurrentUser(BaseModel):
-    username: str
+    # Every authenticated request resolves to exactly one tenant; `account_id`
+    # is what scopes the request (and pins row-level security).
+    account_id: int
+    # The authenticated principal. `user_id`/`email` are set for Supabase end
+    # users; `username` is kept for the self-host admin login.
+    user_id: int | None = None
+    email: str | None = None
+    username: str | None = None

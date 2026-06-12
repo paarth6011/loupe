@@ -113,9 +113,15 @@ backstop; explicit filters keep intent obvious and protect the SQLite path
 
 ## Request → account plumbing
 
-- **Admin/JWT requests:** the access token gains an `account_id` claim
-  (`create_access_token` already sets `sub`; we add the account). `get_db`
-  becomes account-aware: it reads the claim and sets `app.current_account`.
+- **End-user requests (Supabase Auth):** the frontend signs the user in with
+  Supabase and forwards Supabase's access token. The backend verifies it
+  (`decode_supabase_token`, HS256 with the project JWT secret, `authenticated`
+  audience), reads `sub` (the Supabase user UUID), and looks the user up by
+  `users.supabase_user_id`. On first sight the account + user are
+  **provisioned just-in-time** (no signup webhook to keep in sync). The resolved
+  `account_id` scopes the request and sets `app.current_account`.
+- **Admin requests (self-host):** the existing admin JWT still works and maps to
+  the single `default` account, so the single-tenant deploy is unaffected.
 - **Ingest requests (`X-API-Key`):** `verify_ingest_key` returns the `ApiKey`,
   whose `account_id` becomes the request's account. The current
   `require_ingest_auth` returns `None`; it will return the resolved account so
@@ -154,10 +160,25 @@ backstop; explicit filters keep intent obvious and protect the SQLite path
 Signup/login UI, the auth-provider choice, password reset, per-tenant
 rate-limits/quotas, billing. Those are Phases 2–6.
 
-## Open decision (needed before auth wiring)
+## Auth provider: **Supabase Auth** (decided)
 
-**Supabase Auth vs. roll-our-own auth.** The data model above is identical either
-way; the only difference is whether `account_id` arrives in a Supabase-issued JWT
-(we verify their JWKS) or our own (we already mint HS256 tokens in `auth.py`).
-Recommendation: start with **our own** (the JWT plumbing already exists), and
-treat Supabase Auth as an optional later swap.
+End-user login is handled by **Supabase Auth**; Loupe verifies the Supabase JWT
+and maps it to a tenant. This keeps the dangerous parts (password hashing, reset
+flows, email verification, rate-limiting) out of our codebase, and gives social
+login / MFA as configuration later. Mechanics:
+
+- Supabase signs user tokens **HS256 with the project JWT secret** — the same
+  scheme `auth.py` already uses, so verification needs **no new dependency**
+  (`decode_supabase_token`). Config: `SUPABASE_JWT_SECRET` (+ `authenticated`
+  audience). Empty secret disables the path, so the self-host admin login is
+  unaffected.
+- `users.supabase_user_id` is the stable link (the token's `sub`). Users are
+  **provisioned just-in-time** on first authenticated request — there is no
+  signup webhook, so there is no two-systems-of-record drift to manage.
+- **Keepalive:** Supabase free pauses a project after 7 days idle. Because Auth
+  now sits on the login path, the keepalive cron (already planned for the DB) is
+  load-bearing — it must ping the Supabase project, not just our Postgres.
+
+> Not a one-way door: the data model is identical regardless of provider, so a
+> later switch to self-issued tokens is a contained change (swap
+> `decode_supabase_token` for `decode_token` in the dependency).

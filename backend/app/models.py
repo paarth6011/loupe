@@ -51,7 +51,17 @@ class User(Base):
     account_id: Mapped[int] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    # The stable link to the Supabase Auth user (their JWT `sub`, a UUID). This,
+    # not email, is what we look up by — email can change in Supabase, the id
+    # cannot. Null for non-Supabase principals (e.g. the self-host admin).
+    supabase_user_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True, nullable=True
+    )
+    # Mirrored from the token for display; nullable because non-email providers
+    # (OAuth/phone) may omit it. Unique still holds (Postgres allows many NULLs).
+    email: Mapped[str | None] = mapped_column(
+        String(320), unique=True, index=True, nullable=True
+    )
     role: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="owner"
     )  # "owner" | "member"

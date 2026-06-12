@@ -30,9 +30,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
-    # Single-role MVP admin user
+    # Single-role MVP admin user (self-host / single-tenant path).
     admin_username: str = "admin"
     admin_password: str = "admin"
+
+    # Supabase Auth (end-user login for the multi-tenant SaaS). The frontend
+    # signs users in with Supabase and forwards Supabase's access token; the
+    # backend verifies it HS256 with this secret (Supabase dashboard → Project
+    # Settings → API → JWT Secret) and maps the user to a Loupe account. The
+    # token's audience is "authenticated". Empty disables the Supabase path, so
+    # the existing self-host admin login keeps working unchanged.
+    supabase_jwt_secret: str = ""
+    supabase_jwt_aud: str = "authenticated"
 
     # Cap on auto-created workloads (any valid ingest key can mint one by name).
     # 0 disables the cap.

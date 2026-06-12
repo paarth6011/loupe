@@ -65,7 +65,9 @@ def upgrade() -> None:
         "users",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("account_id", sa.Integer(), nullable=False),
-        sa.Column("email", sa.String(length=320), nullable=False),
+        # Stable link to the Supabase Auth user (JWT `sub`); see docs.
+        sa.Column("supabase_user_id", sa.String(length=255), nullable=True),
+        sa.Column("email", sa.String(length=320), nullable=True),
         sa.Column(
             "role", sa.String(length=16), server_default="owner", nullable=False
         ),
@@ -80,6 +82,12 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_users_account_id"), "users", ["account_id"])
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
+    op.create_index(
+        op.f("ix_users_supabase_user_id"),
+        "users",
+        ["supabase_user_id"],
+        unique=True,
+    )
 
     # --- add account_id (nullable), then backfill, then enforce ---------------
     for table in TENANT_TABLES:
@@ -155,6 +163,7 @@ def downgrade() -> None:
         op.drop_index(f"ix_{table}_account_id", table_name=table)
         op.drop_column(table, "account_id")
 
+    op.drop_index(op.f("ix_users_supabase_user_id"), table_name="users")
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_index(op.f("ix_users_account_id"), table_name="users")
     op.drop_table("users")

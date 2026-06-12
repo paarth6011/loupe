@@ -82,3 +82,27 @@ def decode_stream_ticket(token: str) -> str | None:
     if payload is None or payload.get("scope") != STREAM_SCOPE:
         return None
     return payload.get("sub")
+
+
+def decode_supabase_token(token: str) -> dict | None:
+    """Verify a Supabase-issued access token and return its claims, else None.
+
+    The frontend authenticates end users with Supabase Auth and forwards
+    Supabase's JWT. Supabase signs these HS256 with the project's JWT secret, so
+    we verify with that secret and require the ``authenticated`` audience. The
+    returned ``sub`` (a UUID) is the stable id we map to a Loupe account; we also
+    surface ``email`` for display. Returns None when no Supabase secret is
+    configured, so the self-host admin path is unaffected.
+    """
+    secret = _settings.supabase_jwt_secret
+    if not secret:
+        return None
+    try:
+        return jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            audience=_settings.supabase_jwt_aud,
+        )
+    except JWTError:
+        return None
