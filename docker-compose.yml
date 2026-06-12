@@ -36,6 +36,10 @@ services:
     volumes:
       - ./backend:/app
     environment:
+      # Local dev opts into insecure defaults explicitly. The app now defaults to
+      # ENVIRONMENT=prod (fail closed), so this line is what keeps `docker compose
+      # up` working with the placeholder secret/password below.
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://cloudops:cloudops@db:5432/cloudops}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}

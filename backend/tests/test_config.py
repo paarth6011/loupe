@@ -19,3 +19,10 @@ def test_is_production_detection():
     assert Settings(environment="prod").is_production() is True
     assert Settings(environment="PRODUCTION").is_production() is True
     assert Settings(environment="dev").is_production() is False
+
+
+def test_environment_defaults_to_production():
+    # Secure by default: the declared default must be production so a deployment
+    # that never sets ENVIRONMENT fails closed (refuses insecure secrets, hides
+    # /auth/dev-login) instead of silently running in permissive dev mode.
+    assert Settings.model_fields["environment"].default == "prod"
