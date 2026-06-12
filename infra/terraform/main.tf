@@ -222,6 +222,14 @@ resource "google_cloud_run_v2_service" "backend" {
         name  = "ENVIRONMENT"
         value = "production"
       }
+      # Cloud Run only admits external traffic through Google's front end, which
+      # sets X-Forwarded-For with the real client IP; the container is not
+      # directly reachable. Trusting that header here lets the login throttle key
+      # on the actual client instead of the front end's address.
+      env {
+        name  = "FORWARDED_ALLOW_IPS"
+        value = "*"
+      }
       env {
         name  = "REDIS_URL"
         value = local.redis_url
