@@ -10,7 +10,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudops}
       POSTGRES_DB: ${POSTGRES_DB:-cloudops}
     ports:
-      - "5432:5432"
+      # Bind to loopback only: this is a dev datastore with default credentials
+      # (cloudops/cloudops), so it must never be reachable from the network if
+      # someone runs Compose on a non-laptop host. The backend reaches it over
+      # the Compose network regardless of this published port.
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +26,9 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      # Loopback only: this Redis has no auth and holds the login-failure
+      # counters and cached summaries; never expose it to the network.
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
