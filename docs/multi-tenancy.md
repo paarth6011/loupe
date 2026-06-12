@@ -67,7 +67,15 @@ and on any auto-created workload.
 
 ### Layer 1 — Postgres Row-Level Security (the real guard)
 
-Enable RLS on every tenant table with a policy of the form:
+Enable RLS on the **four data tables** (`workloads`, `metric_samples`, `alerts`,
+`monitors`). The identity/auth-bootstrap tables — `accounts`, `users`,
+`api_keys` — are deliberately **not** under RLS: the API-key hash lookup and the
+login-by-email lookup both run *before* a tenant is known (they are what
+*establish* the tenant), so a "deny when no account set" policy would block the
+very query that resolves the account. Those three are scoped with explicit
+`account_id` filters in app code instead.
+
+Each data table gets a policy of the form:
 
 ```sql
 ALTER TABLE workloads ENABLE ROW LEVEL SECURITY;

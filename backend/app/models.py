@@ -19,11 +19,64 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
+class Account(Base):
+    """A tenant. Every domain row belongs to exactly one account, and
+    cross-account access is blocked by Postgres row-level security (see the
+    0010 migration and docs/multi-tenancy.md)."""
+
+    __tablename__ = "accounts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    plan: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="free"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    users: Mapped[list["User"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan"
+    )
+
+
+class User(Base):
+    """An authenticated principal belonging to one account. ``id`` is the
+    subject the access token resolves to; the token also carries ``account_id``
+    so each request runs scoped to a single tenant."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="owner"
+    )  # "owner" | "member"
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    account: Mapped["Account"] = relationship(back_populates="users")
+
+
 class Workload(Base):
     __tablename__ = "workloads"
 
+    # Workload names are unique *per account*, not globally — two tenants may
+    # each have a "support-bot". Row-level security keeps one account from ever
+    # seeing another's, so the name only needs to be unique within the account.
+    __table_args__ = (
+        UniqueConstraint("account_id", "name", name="uq_workload_account_name"),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -48,9 +101,17 @@ class MetricSample(Base):
 
     # Window/aggregation queries all filter "workload_id == ? AND ts >= ?", which
     # the two single-column indexes serve poorly; this composite covers them.
-    __table_args__ = (Index("ix_samples_workload_ts", "workload_id", "ts"),)
+    # The (account_id, ts) index covers account-wide windows (e.g. /metrics/cost)
+    # that span every workload in a tenant.
+    __table_args__ = (
+        Index("ix_samples_workload_ts", "workload_id", "ts"),
+        Index("ix_samples_account_ts", "account_id", "ts"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     workload_id: Mapped[int] = mapped_column(
         ForeignKey("workloads.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -93,6 +154,9 @@ class Alert(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     workload_id: Mapped[int] = mapped_column(
         ForeignKey("workloads.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -128,6 +192,11 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # The ingestion boundary: a key belongs to one account, so POST /metrics with
+    # this key stamps account_id on the sample (and any auto-created workload).
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     prefix: Mapped[str] = mapped_column(String(32), nullable=False)
     key_hash: Mapped[str] = mapped_column(
@@ -156,6 +225,9 @@ class Monitor(Base):
     __table_args__ = (UniqueConstraint("workload_id", "rule", name="uq_monitor_rule"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     workload_id: Mapped[int] = mapped_column(
         ForeignKey("workloads.id", ondelete="CASCADE"), index=True, nullable=False
     )
