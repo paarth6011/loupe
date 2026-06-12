@@ -5,7 +5,12 @@
 set -e
 
 if [ "${RUN_MIGRATIONS:-0}" = "1" ]; then
+    # Migrations run as the privileged owner (DATABASE_URL): they create tables
+    # and RLS policies. Then provision the restricted runtime role the app
+    # actually serves as, so row-level security binds (a no-op unless
+    # APP_DB_PASSWORD is set). Both must run as the owner, before uvicorn.
     alembic upgrade head
+    python -m app.db_bootstrap
 fi
 
 # Trust X-Forwarded-* from the front end so request.client.host is the real

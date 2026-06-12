@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
-engine = create_engine(get_settings().database_url, pool_pre_ping=True)
+engine = create_engine(get_settings().runtime_database_url(), pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 # Postgres GUC that row-level security reads (see migration 0010). It names the

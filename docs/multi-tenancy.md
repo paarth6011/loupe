@@ -155,6 +155,34 @@ backstop; explicit filters keep intent obvious and protect the SQLite path
   ingest stamps the key's `account_id`; a second account's API key can't read the
   first's workloads.
 
+## Deploy: enabling RLS enforcement (the `loupe_app` role)
+
+RLS is **written by the migration but dormant until the app connects as a
+non-superuser role** — superusers and `BYPASSRLS` roles skip row security
+entirely. The single-host stack handles this with one opt-in secret:
+
+- **Set `APP_DB_PASSWORD`** in `.env` (see `.env.prod.example`) and redeploy
+  (`docker compose -f docker-compose.prod.yml up -d --build`).
+- On boot, after `alembic upgrade head`, `start.sh` runs `python -m
+  app.db_bootstrap`, which (idempotently) creates the `loupe_app` role
+  (`LOGIN NOSUPERUSER NOBYPASSRLS`) and grants it DML on the app schema, with
+  `ALTER DEFAULT PRIVILEGES` so future migrations' tables are covered too.
+- **Migrations keep running as the owner** (`DATABASE_URL` / `POSTGRES_USER`);
+  only request-serving switches to `loupe_app` (the backend derives that
+  connection from `app_db_password` via `Settings.runtime_database_url()`).
+- **Leave `APP_DB_PASSWORD` empty** for a single-tenant self-host instance: the
+  app serves as the owner and RLS bypass is harmless with one tenant.
+
+Verified end-to-end against Postgres 16: as the real `loupe_app` login, a bare
+`SELECT` returns only the pinned account's rows, and an unset pin returns none.
+
+> **Manual equivalent** (if provisioning by hand instead): as the owner, run
+> `CREATE ROLE loupe_app LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD '…';` then
+> `GRANT USAGE ON SCHEMA public`, `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL
+> TABLES IN SCHEMA public`, the matching `GRANT … ON ALL SEQUENCES`, and the two
+> `ALTER DEFAULT PRIVILEGES … TO loupe_app` — then point the app's connection at
+> `loupe_app`.
+
 ## Explicitly out of scope for Phase 1
 
 Signup/login UI, the auth-provider choice, password reset, per-tenant

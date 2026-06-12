@@ -21,6 +21,27 @@ def test_is_production_detection():
     assert Settings(environment="dev").is_production() is False
 
 
+def test_runtime_url_is_owner_when_no_app_password():
+    # Without app_db_password, the app serves on the owner connection (dev/tests/
+    # single-tenant) — migrations and runtime share one URL, as before.
+    s = Settings(database_url="postgresql+psycopg://owner:pw@db:5432/loupe")
+    assert s.runtime_database_url() == s.database_url
+
+
+def test_runtime_url_swaps_to_restricted_role_when_app_password_set():
+    # With app_db_password set, runtime serves as the restricted role on the same
+    # host/db (so RLS binds); migrations still use database_url (the owner).
+    s = Settings(
+        database_url="postgresql+psycopg://owner:pw@db:5432/loupe",
+        app_db_user="loupe_app",
+        app_db_password="secret",
+    )
+    url = s.runtime_database_url()
+    assert url.startswith("postgresql+psycopg://")  # same driver
+    assert "loupe_app:secret@db:5432/loupe" in url  # restricted creds, same target
+    assert "owner" not in url
+
+
 def test_environment_defaults_to_production():
     # Secure by default: the declared default must be production so a deployment
     # that never sets ENVIRONMENT fails closed (refuses insecure secrets, hides
