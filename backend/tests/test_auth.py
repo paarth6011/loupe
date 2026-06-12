@@ -50,7 +50,7 @@ def test_stream_ticket_and_access_token_are_scope_separated():
     """An admin access token must not pass as a stream ticket, and vice versa —
     so a URL-borne ticket can never be replayed against admin/ingest endpoints."""
     access = create_access_token("admin")
-    ticket = create_stream_ticket("admin")
+    ticket = create_stream_ticket("admin", account_id=1)
 
     assert decode_token(access) == "admin"
     assert decode_stream_ticket(ticket) == "admin"

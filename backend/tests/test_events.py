@@ -3,7 +3,7 @@ import json
 
 from sqlalchemy.orm import sessionmaker
 
-from app.models import MetricSample, Workload
+from app.models import Account, MetricSample, Workload
 from app.routers import events
 
 
@@ -56,7 +56,7 @@ def _seed_sample(db_engine, account_id) -> sessionmaker:
 
 def test_read_fingerprint_reflects_state(db_engine, account_id):
     factory = _seed_sample(db_engine, account_id)
-    sample_max, alert_max, open_alerts = events._read_fingerprint(factory)
+    sample_max, alert_max, open_alerts = events._read_fingerprint(factory, account_id)
     assert sample_max >= 1
     assert alert_max == 0  # no alerts seeded
     assert open_alerts == 0
@@ -71,7 +71,7 @@ def test_event_stream_emits_changed(db_engine, account_id, monkeypatch):
 
     async def collect() -> list[str]:
         chunks: list[str] = []
-        async for chunk in events._event_stream(request, factory):
+        async for chunk in events._event_stream(request, factory, account_id):
             chunks.append(chunk)
         return chunks
 
@@ -84,3 +84,45 @@ def test_event_stream_emits_changed(db_engine, account_id, monkeypatch):
     payload = json.loads(changed[0].split("data:", 1)[1].strip())
     assert payload["samples"] >= 1
     assert "alerts" in payload and "open_alerts" in payload
+
+
+def test_fingerprint_is_account_scoped(db_engine, account_id):
+    """A viewer is only woken by changes in their own tenant: the fingerprint
+    filters by account_id, so another account's later samples never move it."""
+    factory = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
+    with factory() as db:
+        # Account A (the seeded default) gets one sample...
+        wl_a = Workload(account_id=account_id, name="a-wl")
+        db.add(wl_a)
+        db.flush()
+        sample_a = MetricSample(
+            account_id=account_id, workload_id=wl_a.id, latency_ms=10, status="ok"
+        )
+        db.add(sample_a)
+
+        # ...account B gets its own workload and two *later* samples.
+        other = Account(name="tenant-b")
+        db.add(other)
+        db.flush()
+        wl_b = Workload(account_id=other.id, name="b-wl")
+        db.add(wl_b)
+        db.flush()
+        db.add_all(
+            [
+                MetricSample(
+                    account_id=other.id, workload_id=wl_b.id, latency_ms=20, status="ok"
+                ),
+                MetricSample(
+                    account_id=other.id, workload_id=wl_b.id, latency_ms=30, status="ok"
+                ),
+            ]
+        )
+        db.commit()
+        a_sample_id = sample_a.id
+        b_id = other.id
+
+    fa = events._read_fingerprint(factory, account_id)
+    fb = events._read_fingerprint(factory, b_id)
+    # A's fingerprint reflects only A's sample; B's later samples don't move it.
+    assert fa[0] == a_sample_id
+    assert fb[0] > fa[0]

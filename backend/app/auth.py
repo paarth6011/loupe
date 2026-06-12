@@ -48,10 +48,19 @@ def create_access_token(subject: str) -> str:
     return jwt.encode(payload, _settings.jwt_secret, algorithm=_settings.jwt_algorithm)
 
 
-def create_stream_ticket(subject: str) -> str:
-    """Mint a short-lived, read-only ticket for the SSE stream (see STREAM_SCOPE)."""
+def create_stream_ticket(subject: str, account_id: int) -> str:
+    """Mint a short-lived, read-only ticket for the SSE stream (see STREAM_SCOPE).
+
+    The ticket carries the viewer's ``account_id`` so the stream can be scoped to
+    one tenant — EventSource has no other way to convey it.
+    """
     expire = datetime.now(timezone.utc) + timedelta(seconds=_STREAM_TICKET_TTL_SECONDS)
-    payload = {"sub": subject, "exp": expire, "scope": STREAM_SCOPE}
+    payload = {
+        "sub": subject,
+        "exp": expire,
+        "scope": STREAM_SCOPE,
+        "account_id": account_id,
+    }
     return jwt.encode(payload, _settings.jwt_secret, algorithm=_settings.jwt_algorithm)
 
 
@@ -82,6 +91,15 @@ def decode_stream_ticket(token: str) -> str | None:
     if payload is None or payload.get("scope") != STREAM_SCOPE:
         return None
     return payload.get("sub")
+
+
+def decode_stream_ticket_account(token: str) -> int | None:
+    """Return the tenant ``account_id`` carried by a valid stream ticket, else
+    None (invalid/expired ticket, wrong scope, or a pre-tenancy ticket)."""
+    payload = _decode(token)
+    if payload is None or payload.get("scope") != STREAM_SCOPE:
+        return None
+    return payload.get("account_id")
 
 
 def decode_supabase_token(token: str) -> dict | None:

@@ -66,9 +66,12 @@ def dev_login(settings: Settings = Depends(get_settings)) -> TokenResponse:
 def stream_ticket(
     user: CurrentUser = Depends(get_current_user),
 ) -> StreamTicketResponse:
-    """Exchange the admin bearer token for a short-lived, read-only ticket used
-    to open the SSE stream. Keeps the full admin JWT out of the stream URL."""
-    return StreamTicketResponse(ticket=create_stream_ticket(user.username))
+    """Exchange the bearer token for a short-lived, read-only ticket used to open
+    the SSE stream. Keeps the full JWT out of the stream URL, and carries the
+    viewer's account so the stream stays scoped to their tenant."""
+    return StreamTicketResponse(
+        ticket=create_stream_ticket(user.username, user.account_id)
+    )
 
 
 @router.get("/me", response_model=CurrentUser)
