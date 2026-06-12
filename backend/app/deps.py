@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.apikeys import verify_ingest_key
 from app.auth import decode_supabase_token, decode_token
-from app.database import get_db
+from app.database import get_db, set_current_account
 from app.models import Account, User
 from app.schemas.auth import CurrentUser
 
@@ -60,15 +60,14 @@ def _default_account_id(db: Session) -> int | None:
     )
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> CurrentUser:
-    if credentials is None:
-        raise _UNAUTHORIZED
-    token = credentials.credentials
+def _resolve_bearer(db: Session, token: str) -> CurrentUser | None:
+    """Resolve a bearer token to a tenant-scoped principal, or None.
 
-    # Multi-tenant path: a Supabase end-user token resolves to that user's tenant.
+    Tries the Supabase end-user token first (the multi-tenant path, provisioning
+    the account/user just-in-time), then falls back to the self-host admin JWT,
+    which maps to the single ``default`` account. Does not pin the session — the
+    caller decides whether this request should be tenant-scoped.
+    """
     claims = decode_supabase_token(token)
     if claims is not None:
         user = _provision_supabase_user(db, claims)
@@ -80,31 +79,52 @@ def get_current_user(
                 username=user.email,
             )
 
-    # Self-host path: the admin JWT maps to the single default account.
     username = decode_token(token)
     if username is not None:
         account_id = _default_account_id(db)
         if account_id is not None:
             return CurrentUser(account_id=account_id, username=username)
 
-    raise _UNAUTHORIZED
+    return None
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
+    if credentials is None:
+        raise _UNAUTHORIZED
+    user = _resolve_bearer(db, credentials.credentials)
+    if user is None:
+        raise _UNAUTHORIZED
+    # Pin the shared request session so row-level security scopes every read to
+    # this tenant (FastAPI caches get_db, so the route body gets this same one).
+    set_current_account(db, user.account_id)
+    return user
 
 
 def require_ingest_auth(
     x_api_key: str | None = Header(default=None),
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
-) -> None:
-    """Authenticate an ingest request via a per-source API key or an admin JWT.
+) -> int:
+    """Authenticate an ingest request and return its tenant's ``account_id``.
 
     The SDK and external sources use an `X-API-Key` header (revocable, scoped to
-    ingestion). The admin JWT is still accepted so the dashboard and manual
-    posting keep working.
+    ingestion); the key belongs to one account, which becomes the request's
+    tenant. A Supabase end-user token or the self-host admin JWT is also accepted
+    so the dashboard and manual posting keep working. The resolved account is
+    used to pin the session (RLS) and to stamp `account_id` on ingested rows.
     """
     if x_api_key:
-        if verify_ingest_key(db, x_api_key) is not None:
-            return
+        key = verify_ingest_key(db, x_api_key)
+        if key is not None:
+            set_current_account(db, key.account_id)
+            return key.account_id
         raise _UNAUTHORIZED
-    if credentials is not None and decode_token(credentials.credentials) is not None:
-        return
+    if credentials is not None:
+        user = _resolve_bearer(db, credentials.credentials)
+        if user is not None:
+            set_current_account(db, user.account_id)
+            return user.account_id
     raise _UNAUTHORIZED

@@ -18,11 +18,19 @@ router = APIRouter(prefix="/apikeys", tags=["apikeys"])
 def create_apikey(
     body: ApiKeyCreate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> ApiKeyCreated:
     """Mint a new ingestion key. The plaintext is returned ONCE, here only."""
     raw, prefix, key_hash = generate_key()
-    key = ApiKey(name=body.name, prefix=prefix, key_hash=key_hash)
+    # api_keys is an auth-bootstrap table (the ingest hash lookup runs before a
+    # tenant is known), so it is NOT under RLS — the account_id is stamped here
+    # and the list/revoke endpoints filter by it in app code.
+    key = ApiKey(
+        account_id=current_user.account_id,
+        name=body.name,
+        prefix=prefix,
+        key_hash=key_hash,
+    )
     db.add(key)
     db.commit()
     db.refresh(key)
@@ -39,13 +47,16 @@ def create_apikey(
 @router.get("", response_model=list[ApiKeyOut])
 def list_apikeys(
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> list[ApiKey]:
     """List active (non-revoked) keys — never the secret, only the prefix."""
     return list(
         db.scalars(
             select(ApiKey)
-            .where(ApiKey.revoked_at.is_(None))
+            .where(
+                ApiKey.account_id == current_user.account_id,
+                ApiKey.revoked_at.is_(None),
+            )
             .order_by(ApiKey.created_at.desc())
         ).all()
     )
@@ -55,11 +66,17 @@ def list_apikeys(
 def revoke_apikey(
     key_id: int,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> None:
     """Revoke a key immediately; it stops authenticating on the next request."""
     key = db.get(ApiKey, key_id)
-    if key is None or key.revoked_at is not None:
+    # api_keys is not RLS-protected, so guard cross-tenant access explicitly: a
+    # key from another account is treated as not found.
+    if (
+        key is None
+        or key.account_id != current_user.account_id
+        or key.revoked_at is not None
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="key not found"
         )

@@ -59,17 +59,30 @@ def _latency_percentiles(
     return percentile(list(latencies), 50), percentile(list(latencies), 95)
 
 
-def _get_or_create_workload(db: Session, name: str, max_workloads: int) -> Workload:
-    workload = db.scalars(select(Workload).where(Workload.name == name)).first()
+def _get_or_create_workload(
+    db: Session, name: str, account_id: int, max_workloads: int
+) -> Workload:
+    # Workload names are unique *per account*; the explicit account_id filter
+    # scopes the lookup on SQLite (no RLS) and matches what RLS enforces on
+    # Postgres. Two tenants may each have a "support-bot".
+    conds = [Workload.account_id == account_id, Workload.name == name]
+    workload = db.scalars(select(Workload).where(*conds)).first()
     if workload is not None:
         return workload
 
-    # Cap auto-created cardinality: any valid key can mint workloads by name, so
-    # without a ceiling a misbehaving or abusive client could create unlimited
-    # rows. 0 disables the cap. (Checked only on a genuinely new name, so the hot
-    # path of existing workloads is unaffected.)
+    # Cap auto-created cardinality *per account*: any valid key can mint workloads
+    # by name, so without a ceiling a misbehaving or abusive client could create
+    # unlimited rows. 0 disables the cap. (Checked only on a genuinely new name,
+    # so the hot path of existing workloads is unaffected.)
     if max_workloads > 0:
-        count = db.scalar(select(func.count()).select_from(Workload)) or 0
+        count = (
+            db.scalar(
+                select(func.count())
+                .select_from(Workload)
+                .where(Workload.account_id == account_id)
+            )
+            or 0
+        )
         if count >= max_workloads:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -80,13 +93,13 @@ def _get_or_create_workload(db: Session, name: str, max_workloads: int) -> Workl
     # race to INSERT; the unique constraint lets only one win. Do the insert in a
     # savepoint so the loser's IntegrityError rolls back just this statement
     # (leaving the ingest transaction usable) and we re-read the winner.
-    workload = Workload(name=name)
+    workload = Workload(account_id=account_id, name=name)
     try:
         with db.begin_nested():
             db.add(workload)
             db.flush()
     except IntegrityError:
-        workload = db.scalars(select(Workload).where(Workload.name == name)).first()
+        workload = db.scalars(select(Workload).where(*conds)).first()
         if workload is None:  # not the unique-name race — surface it
             raise
     return workload
@@ -103,9 +116,11 @@ def ingest_metric(
     summarizer: Summarizer = Depends(get_summarizer),
     notifier: Notifier = Depends(get_notifier),
     session_factory: sessionmaker = Depends(get_session_factory),
-    _: None = Depends(require_ingest_auth),
+    account_id: int = Depends(require_ingest_auth),
 ) -> MetricIngestResponse:
-    workload = _get_or_create_workload(db, body.workload, settings.max_workloads)
+    workload = _get_or_create_workload(
+        db, body.workload, account_id, settings.max_workloads
+    )
 
     # Use the client-supplied cost, else estimate it from model + token counts.
     cost_usd = body.cost_usd
@@ -113,6 +128,7 @@ def ingest_metric(
         cost_usd = compute_cost(body.model, body.input_tokens, body.output_tokens)
 
     sample = MetricSample(
+        account_id=account_id,
         workload_id=workload.id,
         latency_ms=body.latency_ms,
         status=body.status,
