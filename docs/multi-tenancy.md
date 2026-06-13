@@ -9,8 +9,8 @@
 ## Goal
 
 Introduce **tenants** (accounts) and **users**, scope every domain row to a
-tenant, and make cross-tenant data access **impossible at the database level** —
-before any public signup exists. Phase 1 is "done" when:
+tenant, and make cross-tenant data access **impossible at the database level**.
+This is the foundation layer (now shipped); it was complete when:
 
 - accounts and users exist,
 - every domain row carries an `account_id`,
@@ -117,9 +117,9 @@ backstop; explicit filters keep intent obvious and protect the SQLite path
 
 - **End-user requests (Supabase Auth):** the frontend signs the user in with
   Supabase and forwards Supabase's access token. The backend verifies it
-  (`decode_supabase_token`, HS256 with the project JWT secret, `authenticated`
-  audience), reads `sub` (the Supabase user UUID), and looks the user up by
-  `users.supabase_user_id`. On first sight the account + user are
+  (`decode_supabase_token` — **ES256 against the project's published JWKS**,
+  `authenticated` audience), reads `sub` (the Supabase user UUID), and looks the
+  user up by `users.supabase_user_id`. On first sight the account + user are
   **provisioned just-in-time** (no signup webhook to keep in sync). The resolved
   `account_id` scopes the request and sets `app.current_account`.
 - **Admin requests (self-host):** the existing admin JWT still works and maps to
@@ -185,10 +185,12 @@ Verified end-to-end against Postgres 16: as the real `loupe_app` login, a bare
 > `ALTER DEFAULT PRIVILEGES … TO loupe_app` — then point the app's connection at
 > `loupe_app`.
 
-## Explicitly out of scope for Phase 1
+## Out of scope for this layer
 
-Signup/login UI, the auth-provider choice, password reset, per-tenant
-rate-limits/quotas, billing. Those are Phases 2–6.
+Signup/login UI, the auth-provider choice, and password reset were deliberately
+**not** part of this data-model layer — they've since shipped on top of it
+(Supabase Auth + JIT provisioning + code-based reset). Still ahead: per-tenant
+rate-limits/quotas and billing.
 
 ## Auth provider: **Supabase Auth** (decided)
 
@@ -197,11 +199,13 @@ and maps it to a tenant. This keeps the dangerous parts (password hashing, reset
 flows, email verification, rate-limiting) out of our codebase, and gives social
 login / MFA as configuration later. Mechanics:
 
-- Supabase signs user tokens **HS256 with the project JWT secret** — the same
-  scheme `auth.py` already uses, so verification needs **no new dependency**
-  (`decode_supabase_token`). Config: `SUPABASE_JWT_SECRET` (+ `authenticated`
-  audience). Empty secret disables the path, so the self-host admin login is
-  unaffected.
+- Supabase signs user tokens **ES256 (asymmetric)** by default. The backend
+  verifies them against the project's published **JWKS** (fetched + cached from
+  `SUPABASE_URL`/auth/v1/.well-known/jwks.json), checking the `authenticated`
+  audience — the signing keys are public, so there's no backend secret to manage.
+  Config: `SUPABASE_URL`. (A legacy shared-HS256 path via `SUPABASE_JWT_SECRET`
+  is still supported as a fallback.) Both empty disables the path, so the
+  self-host admin login is unaffected.
 - `users.supabase_user_id` is the stable link (the token's `sub`). Users are
   **provisioned just-in-time** on first authenticated request — there is no
   signup webhook, so there is no two-systems-of-record drift to manage.
