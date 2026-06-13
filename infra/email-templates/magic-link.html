@@ -1,0 +1,93 @@
+<!doctype html>
+<!--
+  Loupe — "Magic Link" email (Supabase: Authentication → Emails → Magic link or OTP)
+  Variables used: {{ .ConfirmationURL }}
+  See README.md in this folder for paste instructions.
+-->
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Sign in to Loupe</title>
+    <!--[if mso]><style>* { font-family: Arial, sans-serif !important; }</style><![endif]-->
+    <style>
+      @media (max-width: 600px) {
+        .px { padding-left: 24px !important; padding-right: 24px !important; }
+        .card { border-radius: 0 !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0; padding:0; background-color:#f5f6f8; -webkit-font-smoothing:antialiased;">
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0;">Your magic sign-in link for Loupe.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f6f8;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" class="card" style="width:560px; max-width:560px; background-color:#ffffff; border:1px solid #e6e8ec; border-radius:14px; overflow:hidden;">
+
+            <!-- Header band -->
+            <tr>
+              <td class="px" style="background-color:#0b0d12; background-image:linear-gradient(135deg,#0b0d12,#14181f); padding:26px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:middle;">
+                      <span style="display:inline-block; width:30px; height:30px; border-radius:7px; background-color:#5e9bff; background-image:linear-gradient(135deg,#5e9bff,#7b5cff); vertical-align:middle;"></span>
+                    </td>
+                    <td style="vertical-align:middle; padding-left:11px;">
+                      <span style="font-family:'Inter',-apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-size:19px; font-weight:700; letter-spacing:-0.3px; color:#ffffff;">Loupe</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+              <td class="px" style="padding:36px 32px 8px;">
+                <h1 style="margin:0 0 14px; font-family:'Inter',-apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-size:21px; font-weight:600; letter-spacing:-0.3px; color:#15181f;">Sign in to Loupe</h1>
+                <p style="margin:0 0 24px; font-family:'Inter',-apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-size:15px; line-height:1.6; color:#4a5160;">
+                  Click below to sign in to your Loupe dashboard. This link expires shortly and can only be used once.
+                </p>
+
+                <!-- Bulletproof button -->
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" bgcolor="#5e9bff" style="border-radius:10px; background-color:#5e9bff; background-image:linear-gradient(135deg,#5e9bff,#7b5cff);">
+                      <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ .ConfirmationURL }}" style="height:46px;v-text-anchor:middle;width:190px;" arcsize="22%" fillcolor="#5e9bff" stroke="f"><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;">Sign in</center></v:roundrect><![endif]-->
+                      <!--[if !mso]><!-- -->
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block; padding:14px 30px; font-family:'Inter',-apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:10px;">Sign in to Loupe</a>
+                      <!--<![endif]-->
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:24px 0 6px; font-family:'Inter',-apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.6; color:#69748a;">
+                  Button not working? Paste this link into your browser:
+                </p>
+                <p style="margin:0 0 24px; font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace; font-size:12px; line-height:1.5; word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#3f7ce6; text-decoration:none;">{{ .ConfirmationURL }}</a>
+                </p>
+
+                <p style="margin:0; padding-top:20px; border-top:1px solid #eef0f3; font-family:'Inter',-apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.6; color:#8a93a3;">
+                  If you didn't try to sign in, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td class="px" style="padding:22px 32px 28px;">
+                <p style="margin:0; font-family:'Inter',-apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-size:12px; line-height:1.6; color:#9aa3b2;">
+                  Loupe · open-source observability for LLM apps · <a href="https://getloupe.net" style="color:#69748a; text-decoration:none;">getloupe.net</a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
