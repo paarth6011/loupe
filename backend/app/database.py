@@ -10,7 +10,19 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
-engine = create_engine(get_settings().runtime_database_url(), pool_pre_ping=True)
+engine = create_engine(
+    get_settings().runtime_database_url(),
+    # Detect and replace connections the DB has dropped, on checkout.
+    pool_pre_ping=True,
+    # Proactively retire connections older than 30 min so stale/half-dead ones
+    # don't pile up (the small prod VM drops idle connections under memory
+    # pressure). Belt-and-braces with pool_pre_ping.
+    pool_recycle=1800,
+    # A little more headroom than the 5+10 default so a burst of concurrent
+    # viewers (each SSE stream polls the DB) can't starve the request path.
+    pool_size=10,
+    max_overflow=20,
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 # Postgres GUC that row-level security reads (see migration 0010). It names the
@@ -18,22 +30,40 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 _IS_POSTGRES = engine.dialect.name == "postgresql"
 
 
+def _reset_tenant_guc(dbapi_connection) -> None:
+    """Clear the tenant pin on a raw DBAPI connection (raises if it's dead)."""
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("SELECT set_config('app.current_account', '', false)")
+    finally:
+        cursor.close()
+
+
+def _reset_tenant_on_checkin(dbapi_connection, connection_record) -> None:
+    """Clear the tenant pin before a connection re-enters the pool.
+
+    Without this, a pooled connection could carry one request's account_id into
+    the next request. Combined with the fail-closed RLS policy (an empty setting
+    becomes NULL and matches no rows), a missing pin therefore *denies* rather
+    than leaks — the unset state is safe, a stale state would not be.
+
+    Must NEVER raise. If the connection has already died (the small prod VM drops
+    connections under memory pressure), running SQL here throws; letting that
+    propagate out of the checkin event corrupts the pool's accounting and leaks
+    the slot, until every slot is gone and the pool is permanently exhausted (the
+    bug this guards against). On failure we skip the reset — pool_pre_ping
+    discards the dead connection on its next checkout, and the fail-closed RLS
+    policy keeps an unreset connection safe (it denies rows).
+    """
+    try:
+        _reset_tenant_guc(dbapi_connection)
+    except Exception:
+        pass
+
+
 if _IS_POSTGRES:
-
-    @event.listens_for(engine, "checkin")
-    def _reset_tenant_on_checkin(dbapi_connection, connection_record) -> None:
-        """Clear the tenant pin before a connection re-enters the pool.
-
-        Without this, a pooled connection could carry one request's account_id
-        into the next request. Combined with the fail-closed RLS policy (an empty
-        setting becomes NULL and matches no rows), a missing pin therefore *denies*
-        rather than leaks — the unset state is safe, a stale state would not be.
-        """
-        cursor = dbapi_connection.cursor()
-        try:
-            cursor.execute("SELECT set_config('app.current_account', '', false)")
-        finally:
-            cursor.close()
+    # Only Postgres has the RLS GUC; SQLite (tests) has no per-connection state.
+    event.listens_for(engine, "checkin")(_reset_tenant_on_checkin)
 
 
 def set_current_account(db: Session, account_id: int) -> None:
