@@ -62,6 +62,40 @@ def db_session(db_engine: Engine) -> Iterator[Session]:
         session.close()
 
 
+# The single tenant every test runs under. Mirrors what migration 0010 does in
+# real deployments (it inserts a "default" account), so the admin login and all
+# domain rows resolve to it. SQLite has no row-level security, so cross-tenant
+# isolation in this suite is exercised by the explicit account_id filters in app
+# code; the Postgres RLS proof lives in test_tenant_isolation.py.
+DEFAULT_ACCOUNT_NAME = "default"
+
+
+@pytest.fixture(autouse=True)
+def _seed_default_account(db_engine: Engine) -> int:
+    """Seed the default tenant into every test DB and return its id.
+
+    Autouse so API-driven tests (which never touch the account directly) still
+    have a tenant for the admin login to resolve to.
+    """
+    from app.models import Account
+
+    TestSession = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
+    session = TestSession()
+    try:
+        account = Account(name=DEFAULT_ACCOUNT_NAME)
+        session.add(account)
+        session.commit()
+        return account.id
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def account_id(_seed_default_account: int) -> int:
+    """The id of the seeded default tenant, for stamping rows built directly."""
+    return _seed_default_account
+
+
 @pytest.fixture
 def notifier() -> CapturingNotifier:
     return CapturingNotifier()

@@ -25,6 +25,7 @@ def _open_alerts_by_rule(db: Session, workload_id: int) -> dict[str, Alert]:
 def _reconcile(
     db: Session,
     open_by_rule: dict[str, Alert],
+    account_id: int,
     workload_id: int,
     rule: str,
     firing: bool,
@@ -42,6 +43,7 @@ def _reconcile(
     existing = open_by_rule.get(rule)
     if firing and existing is None:
         alert = Alert(
+            account_id=account_id,
             workload_id=workload_id,
             rule=rule,
             message=message,
@@ -126,6 +128,7 @@ def evaluate_thresholds(
     _reconcile(
         db,
         open_by_rule,
+        sample.account_id,
         sample.workload_id,
         "high_latency",
         lat_enabled and max_latency > lat_threshold,
@@ -153,6 +156,7 @@ def evaluate_thresholds(
     _reconcile(
         db,
         open_by_rule,
+        sample.account_id,
         sample.workload_id,
         "high_error_rate",
         error_firing,
@@ -182,6 +186,7 @@ def evaluate_thresholds(
     _reconcile(
         db,
         open_by_rule,
+        sample.account_id,
         sample.workload_id,
         "cost_spike",
         cost_enabled and max_cost > cost_threshold,
@@ -210,6 +215,7 @@ def evaluate_thresholds(
     _reconcile(
         db,
         open_by_rule,
+        sample.account_id,
         sample.workload_id,
         "token_spike",
         tok_enabled and max_tokens > tok_threshold,
@@ -236,6 +242,7 @@ def evaluate_thresholds(
     _reconcile(
         db,
         open_by_rule,
+        sample.account_id,
         sample.workload_id,
         "rate_limit_surge",
         rl_firing,
@@ -274,6 +281,7 @@ def evaluate_thresholds(
     _reconcile(
         db,
         open_by_rule,
+        sample.account_id,
         sample.workload_id,
         "latency_anomaly",
         lat_anom_enabled and lat is not None and lat.firing,
@@ -306,6 +314,7 @@ def evaluate_thresholds(
     _reconcile(
         db,
         open_by_rule,
+        sample.account_id,
         sample.workload_id,
         "cost_anomaly",
         cost_anom_enabled and cost is not None and cost.firing,

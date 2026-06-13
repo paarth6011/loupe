@@ -9,8 +9,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 from starlette.concurrency import run_in_threadpool
 
-from app.auth import decode_stream_ticket
-from app.database import get_session_factory
+from app.auth import decode_stream_ticket_account
+from app.database import get_session_factory, set_current_account
 from app.models import Alert, MetricSample
 
 router = APIRouter(tags=["events"])
@@ -24,19 +24,36 @@ _POLL_SECONDS = 3.0
 _MAX_CONNECTION_SECONDS = 300.0
 
 
-def _read_fingerprint(session_factory: sessionmaker) -> tuple[int, int, int]:
-    """A cheap snapshot of mutable state: the newest sample id, the newest alert
-    id, and the count of currently-open alerts. Any change to this triple means
-    the dashboard has something new to show and should refetch. Three small
-    indexed aggregates — far cheaper than streaming the data itself."""
+def _read_fingerprint(
+    session_factory: sessionmaker, account_id: int
+) -> tuple[int, int, int]:
+    """A cheap snapshot of one tenant's mutable state: the newest sample id, the
+    newest alert id, and the count of currently-open alerts. Any change to this
+    triple means the dashboard has something new to show and should refetch.
+    Three small indexed aggregates — far cheaper than streaming the data itself.
+
+    Scoped to the viewer's account both ways: the session is pinned for
+    row-level security (Postgres), and the queries filter by account_id
+    explicitly (so the SQLite path is scoped too, and intent is obvious)."""
     with session_factory() as db:
-        sample_max = db.scalar(select(func.max(MetricSample.id))) or 0
-        alert_max = db.scalar(select(func.max(Alert.id))) or 0
+        set_current_account(db, account_id)
+        sample_max = (
+            db.scalar(
+                select(func.max(MetricSample.id)).where(
+                    MetricSample.account_id == account_id
+                )
+            )
+            or 0
+        )
+        alert_max = (
+            db.scalar(select(func.max(Alert.id)).where(Alert.account_id == account_id))
+            or 0
+        )
         open_alerts = (
             db.scalar(
                 select(func.count())
                 .select_from(Alert)
-                .where(Alert.resolved_at.is_(None))
+                .where(Alert.account_id == account_id, Alert.resolved_at.is_(None))
             )
             or 0
         )
@@ -44,12 +61,15 @@ def _read_fingerprint(session_factory: sessionmaker) -> tuple[int, int, int]:
 
 
 async def _event_stream(
-    request: Request, session_factory: sessionmaker
+    request: Request, session_factory: sessionmaker, account_id: int
 ) -> AsyncIterator[str]:
     """Server-Sent Events: emit a `changed` event whenever the data fingerprint
     moves, and a keepalive comment otherwise so the connection survives idle
     periods and proxies. The fingerprint read is the only blocking work, and it's
-    pushed to a threadpool so the event loop stays free; the sleep is async."""
+    pushed to a threadpool so the event loop stays free; the sleep is async.
+
+    The fingerprint is scoped to ``account_id`` so a viewer is only woken by
+    changes within their own tenant."""
     last: tuple[int, int, int] | None = None
     started = time.monotonic()
     # Greet immediately so the client knows the stream is live.
@@ -57,7 +77,9 @@ async def _event_stream(
     while time.monotonic() - started < _MAX_CONNECTION_SECONDS:
         if await request.is_disconnected():
             break
-        fingerprint = await run_in_threadpool(_read_fingerprint, session_factory)
+        fingerprint = await run_in_threadpool(
+            _read_fingerprint, session_factory, account_id
+        )
         if fingerprint != last:
             last = fingerprint
             payload = json.dumps(
@@ -85,13 +107,15 @@ def events(
     EventSource can't set an Authorization header, so authentication uses a
     short-lived, read-only *stream ticket* (minted via POST /auth/stream-ticket)
     passed as the `ticket` query param — never the full admin JWT, which would
-    otherwise leak into proxy logs and browser history. A 401 here is terminal
-    for this connection; the client mints a fresh ticket and reconnects.
+    otherwise leak into proxy logs and browser history. The ticket carries the
+    viewer's account, which scopes the stream to their tenant. A 401 here is
+    terminal for this connection; the client mints a fresh ticket and reconnects.
     """
-    if ticket is None or decode_stream_ticket(ticket) is None:
+    account_id = decode_stream_ticket_account(ticket) if ticket else None
+    if account_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     return StreamingResponse(
-        _event_stream(request, session_factory),
+        _event_stream(request, session_factory, account_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

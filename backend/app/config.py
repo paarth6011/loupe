@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 # Known-insecure development defaults. Allowed in dev; refused in production.
 INSECURE_JWT_SECRET = "change-me-in-prod"
@@ -19,8 +20,16 @@ class Settings(BaseSettings):
     # dev-login and accepting the placeholder JWT secret.
     environment: str = "prod"
 
-    # Database
+    # Database. `database_url` is the privileged/owner connection used to run
+    # migrations (which create tables and RLS policies). At runtime the app
+    # instead serves as a NON-superuser role so Postgres row-level security
+    # actually binds — superusers (and BYPASSRLS roles) skip RLS entirely, which
+    # would silently defeat tenant isolation. Setting `app_db_password` opts into
+    # that restricted role; leaving it empty (dev, tests, single-tenant self-host)
+    # serves as `database_url`, unchanged.
     database_url: str = "postgresql+psycopg://cloudops:cloudops@db:5432/cloudops"
+    app_db_user: str = "loupe_app"
+    app_db_password: str = ""
 
     # Comma-separated allowed CORS origins (frontend URL in prod).
     cors_origins: str = "http://localhost:5173"
@@ -30,9 +39,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
-    # Single-role MVP admin user
+    # Single-role MVP admin user (self-host / single-tenant path).
     admin_username: str = "admin"
     admin_password: str = "admin"
+
+    # Supabase Auth (end-user login for the multi-tenant SaaS). The frontend
+    # signs users in with Supabase and forwards Supabase's access token; the
+    # backend verifies it HS256 with this secret (Supabase dashboard → Project
+    # Settings → API → JWT Secret) and maps the user to a Loupe account. The
+    # token's audience is "authenticated". Empty disables the Supabase path, so
+    # the existing self-host admin login keeps working unchanged.
+    supabase_jwt_secret: str = ""
+    supabase_jwt_aud: str = "authenticated"
 
     # Cap on auto-created workloads (any valid ingest key can mint one by name).
     # 0 disables the cap.
@@ -93,6 +111,18 @@ class Settings(BaseSettings):
     # Alert notifications. Empty -> notifications disabled (NullNotifier).
     # Works with Slack / Discord / generic webhook receivers.
     notify_webhook_url: str = ""
+
+    def runtime_database_url(self) -> str:
+        """The connection the app *serves* on. With `app_db_password` set, it's
+        the restricted `app_db_user` role (so RLS binds) on the same host/db as
+        `database_url`; otherwise `database_url` itself (migrations always use
+        `database_url` directly)."""
+        if not self.app_db_password:
+            return self.database_url
+        url = make_url(self.database_url).set(
+            username=self.app_db_user, password=self.app_db_password
+        )
+        return url.render_as_string(hide_password=False)
 
     def is_production(self) -> bool:
         return self.environment.strip().lower() in {"prod", "production"}

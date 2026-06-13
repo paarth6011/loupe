@@ -62,7 +62,7 @@ def update_monitor(
     body: MonitorUpdate,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-    _: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> MonitorOut:
     """Enable/disable a rule or override its threshold for one workload.
 
@@ -80,7 +80,14 @@ def update_monitor(
         select(Monitor).where(Monitor.workload_id == workload_id, Monitor.rule == rule)
     ).first()
     if monitor is None:
-        monitor = Monitor(workload_id=workload_id, rule=rule, enabled=True)
+        # The workload was just resolved under this tenant's RLS pin, so its
+        # account is the current user's; stamp it so the monitor is co-tenant.
+        monitor = Monitor(
+            account_id=current_user.account_id,
+            workload_id=workload_id,
+            rule=rule,
+            enabled=True,
+        )
         db.add(monitor)
 
     fields = body.model_fields_set
