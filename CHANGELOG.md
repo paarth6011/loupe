@@ -6,7 +6,7 @@ All notable changes to Loupe are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.2.0] — 2026-06-11
+## [0.2.0]
 
 A visual overhaul and manual alert control, plus project polish.
 
@@ -30,7 +30,7 @@ A visual overhaul and manual alert control, plus project polish.
   charts (glow lines, gradient fills, custom dark tooltips). The README now leads
   with an animated demo.
 
-## [0.1.0] — 2026-06-10
+## [0.1.0]
 
 The initial open-source release: **observability for LLM apps** — track latency,
 tokens, and cost per call, with explainable alerts, plain-English incident
