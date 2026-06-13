@@ -33,15 +33,19 @@ Email**. Toggle **"Confirm email"**:
   this: it shows "Check your email to confirm your account" and the dashboard
   appears once they confirm. Turn this on before a public launch.
 
-**b) Token signing — HS256 (shared secret) vs. JWKS.** The backend
-(`decode_supabase_token`) currently verifies the **legacy shared HS256 secret**.
-Check **Project Settings → API → JWT Keys** (or "JWT Settings"):
-- If the active key is the **shared/HS256 secret** → you're done, no code needed.
-- If the project uses **asymmetric signing keys (ECC/RSA, i.e. RS256/ES256)** →
-  our HS256 verify will reject the tokens. Two options: keep/use the **legacy
-  JWT secret** if the project still offers it, or ask for the **JWKS follow-up**
-  (a contained change in `auth.py` only — fetch + cache the project's JWKS and
-  verify RS/ES256). Decide before going live.
+**b) Token signing — JWKS (asymmetric) vs. legacy HS256.** The backend
+(`decode_supabase_token`) supports **both**. Check **Project Settings → API →
+JWT Keys**:
+- **Current key is `ECC` / `RSA` (ES256/RS256)** — the modern Supabase default.
+  Use the **JWKS path**: set `SUPABASE_URL` on the backend (Step 4a) and the
+  backend fetches + caches the project's public keys automatically. ✅ This is
+  what a freshly created project uses today.
+- **Current key is `Legacy HS256 (Shared Secret)`** — use the **shared-secret
+  path** instead: set `SUPABASE_JWT_SECRET` (the JWT secret) and leave
+  `SUPABASE_URL` empty.
+
+You set one or the other, not both — if `SUPABASE_URL` is set it takes the JWKS
+path.
 
 ## Step 3 — Grab the three values
 
@@ -49,22 +53,28 @@ From **Project Settings → API**:
 
 | Value | Where it's used | Secret? |
 |---|---|---|
-| **Project URL** (`https://<ref>.supabase.co`) | frontend + keepalive | public |
+| **Project URL** (`https://<ref>.supabase.co`) | backend (JWKS) + frontend + keepalive | public |
 | **anon / public key** | frontend + keepalive | public (safe in bundle) |
-| **JWT secret** | backend (token verification) | **secret — never commit** |
+| **JWT secret** | backend — only for the legacy HS256 path (Step 2b) | **secret — never commit** |
 
-> Keep the JWT secret out of git. It goes only in the VM `.env` (gitignored) and,
-> if you later use CI to deploy, in a CI secret store.
+> On the JWKS path (the default), the backend needs only the **Project URL** —
+> the signing keys it fetches are public, so there's no backend secret to manage.
+> You only need the JWT secret if your project still signs with legacy HS256;
+> keep it out of git (VM `.env`, or a CI secret store) if so.
 
 ## Step 4 — Wire the values in three places
 
 ### 4a. Backend (VM)
 
-On the VM, edit `.env` (the gitignored one next to `docker-compose.prod.yml`):
+On the VM, edit `.env` (the gitignored one next to `docker-compose.prod.yml`).
+**JWKS path (your project — ES256):** set the project URL; no secret needed.
 
 ```sh
-SUPABASE_JWT_SECRET=<the JWT secret from Step 3>
+SUPABASE_URL=https://<ref>.supabase.co
 ```
+
+> Legacy HS256 path instead: leave `SUPABASE_URL` empty and set
+> `SUPABASE_JWT_SECRET=<the JWT secret from Step 3>`.
 
 Then redeploy:
 
@@ -72,12 +82,14 @@ Then redeploy:
 docker compose -f docker-compose.prod.yml up -d --build backend
 ```
 
-`docker-compose.prod.yml` already forwards `SUPABASE_JWT_SECRET` to the backend
-(empty = path disabled). Verify it's set inside the container:
+`docker-compose.prod.yml` forwards both `SUPABASE_URL` and `SUPABASE_JWT_SECRET`
+to the backend (both empty = path disabled). Verify and sanity-check the JWKS
+endpoint is reachable from the box:
 
 ```sh
 docker compose -f docker-compose.prod.yml exec backend \
-  sh -c 'test -n "$SUPABASE_JWT_SECRET" && echo "secret set" || echo "MISSING"'
+  sh -c 'test -n "$SUPABASE_URL" && echo "url set: $SUPABASE_URL" || echo "MISSING"'
+curl -fsS "https://<ref>.supabase.co/auth/v1/.well-known/jwks.json" | head -c 200; echo
 ```
 
 ### 4b. Frontend (Vercel — the SaaS build)
@@ -149,7 +161,7 @@ auth is on the login path.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Login shows the admin username/password form | `VITE_SUPABASE_*` not in the build | Set both in Vercel, **redeploy** (build-time) |
-| Sign-up works but every API call 401s | Backend `SUPABASE_JWT_SECRET` unset/wrong, or project uses JWKS not HS256 | Re-check 4a; verify HS256 vs JWKS (Step 2b) |
+| Sign-up works but every API call 401s | Backend `SUPABASE_URL` unset (JWKS path), wrong project, or the box can't reach the JWKS endpoint | Re-check 4a; `curl` the `.well-known/jwks.json` from the VM; confirm signing scheme (Step 2b) |
 | 401s only after a while | Access token expired and didn't refresh | Confirm Supabase client has `autoRefreshToken` (it does) — check for clock skew / blocked Supabase domain |
 | Keepalive workflow red | Wrong URL/key, or project paused | Re-set the two repo secrets; unpause the project in the dashboard |
 | Users locked out after a quiet week | Project paused (keepalive not running) | Unpause; confirm the cron is enabled and green |
@@ -158,7 +170,7 @@ auth is on the login path.
 
 Fully reversible — clear the values and redeploy:
 
-- VM `.env`: blank `SUPABASE_JWT_SECRET`; Vercel: remove `VITE_SUPABASE_*` and
-  redeploy. The app drops back to the single-admin login. (Provisioned
-  `accounts`/`users` rows stay in the DB; they're harmless and reusable if you
-  re-enable.)
+- VM `.env`: blank `SUPABASE_URL` (and `SUPABASE_JWT_SECRET` if used); Vercel:
+  remove `VITE_SUPABASE_*` and redeploy. The app drops back to the single-admin
+  login. (Provisioned `accounts`/`users` rows stay in the DB; they're harmless
+  and reusable if you re-enable.)

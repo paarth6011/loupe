@@ -1,15 +1,18 @@
 """Supabase end-user auth: token verification + just-in-time provisioning.
 
-These run on SQLite and need no real Supabase project — we sign tokens with a
-test secret the way Supabase would (HS256, ``authenticated`` audience) and assert
-the backend verifies them and stands up the tenant on first sight.
+These run on SQLite and need no real Supabase project. We sign tokens the way
+Supabase would — both the legacy shared HS256 secret and the modern asymmetric
+ES256/JWKS default — and assert the backend verifies them (and rejects bad ones)
+and stands up the tenant on first sight.
 """
 
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from jose import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from jose import jwk, jwt
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -113,3 +116,85 @@ def test_resolve_bearer_scopes_to_provisioned_tenant(db_session: Session) -> Non
     user = db_session.scalar(select(User).where(User.supabase_user_id == sub))
     assert user is not None
     assert current.account_id == user.account_id
+
+
+# --- Asymmetric ES256 / JWKS path (the modern Supabase default) -------------
+
+
+def _es256_keypair(kid: str) -> tuple[str, dict]:
+    """Return (private PEM, public JWK with kid) for an ES256 (P-256) key."""
+    priv = ec.generate_private_key(ec.SECP256R1())
+    priv_pem = priv.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode()
+    pub_pem = priv.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    jwk_dict = jwk.construct(pub_pem, "ES256").to_dict()
+    jwk_dict["kid"] = kid
+    # Some jose versions return bytes for the JWK fields; normalize to str so it
+    # round-trips like a real JWKS document would.
+    return priv_pem, {
+        k: (v.decode() if isinstance(v, bytes) else v) for k, v in jwk_dict.items()
+    }
+
+
+def _make_es256_token(priv_pem: str, *, kid: str, sub: str, email: str) -> str:
+    claims = {
+        "sub": sub,
+        "aud": _AUD,
+        "email": email,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    return jwt.encode(claims, priv_pem, algorithm="ES256", headers={"kid": kid})
+
+
+@pytest.fixture
+def _jwks_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    # supabase_url set → decode_supabase_token takes the JWKS path regardless of
+    # the shared secret.
+    monkeypatch.setattr(auth._settings, "supabase_url", "https://proj.supabase.co")
+
+
+def test_jwks_token_verified(monkeypatch: pytest.MonkeyPatch, _jwks_mode: None) -> None:
+    kid = "key-1"
+    priv_pem, pub_jwk = _es256_keypair(kid)
+    monkeypatch.setattr(auth, "_fetch_jwks", lambda force=False: {"keys": [pub_jwk]})
+
+    sub = str(uuid.uuid4())
+    token = _make_es256_token(priv_pem, kid=kid, sub=sub, email="ec@example.com")
+    claims = auth.decode_supabase_token(token)
+    assert claims is not None
+    assert claims["sub"] == sub
+    assert claims["email"] == "ec@example.com"
+
+
+def test_jwks_signature_must_match_published_key(
+    monkeypatch: pytest.MonkeyPatch, _jwks_mode: None
+) -> None:
+    kid = "key-1"
+    signing_pem, _ = _es256_keypair(kid)
+    _, other_pub_jwk = _es256_keypair(kid)  # JWKS serves a DIFFERENT key, same kid
+    monkeypatch.setattr(
+        auth, "_fetch_jwks", lambda force=False: {"keys": [other_pub_jwk]}
+    )
+
+    token = _make_es256_token(
+        signing_pem, kid=kid, sub=str(uuid.uuid4()), email="x@example.com"
+    )
+    assert auth.decode_supabase_token(token) is None
+
+
+def test_jwks_unavailable_rejects(
+    monkeypatch: pytest.MonkeyPatch, _jwks_mode: None
+) -> None:
+    # JWKS can't be fetched (e.g. Supabase unreachable, empty cache) → reject.
+    priv_pem, _ = _es256_keypair("key-1")
+    monkeypatch.setattr(auth, "_fetch_jwks", lambda force=False: None)
+    token = _make_es256_token(
+        priv_pem, kid="key-1", sub=str(uuid.uuid4()), email="x@example.com"
+    )
+    assert auth.decode_supabase_token(token) is None
