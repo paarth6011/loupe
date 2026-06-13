@@ -18,3 +18,19 @@
 		reverse_proxy frontend:8080
 	}
 }
+
+# Optional dedicated API subdomain (e.g. api.getloupe.net) for a SaaS deploy
+# whose frontend is hosted elsewhere (Vercel). The WHOLE host is the API — the
+# backend's routes are served at the root (/health, /auth/login, /events, …),
+# so the SPA points VITE_API_URL straight at https://api.example.com (no /api).
+# Caddy auto-issues a Let's Encrypt cert, so the DNS record must resolve to this
+# box and NOT be proxied (Cloudflare grey-cloud / DNS-only).
+#
+# When API_DOMAIN is unset (the normal self-host case) this falls back to an
+# internal-only address that never receives public traffic — keeping the block
+# valid without issuing a real cert.
+{$API_DOMAIN:localhost:8081} {
+	reverse_proxy backend:8080 {
+		flush_interval -1
+	}
+}
