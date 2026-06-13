@@ -9,7 +9,8 @@ Everything runs locally via Docker Compose — no cloud account needed.
 
 ```bash
 cp .env.example .env
-docker compose up --build      # db + redis + backend + frontend + prober
+docker compose up --build      # db + redis + backend + frontend (empty instance)
+# add canned demo data with the optional prober: docker compose --profile demo up -d
 ```
 
 Open http://localhost:5173 (login `admin` / `admin`) and the API docs at

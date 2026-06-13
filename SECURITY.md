@@ -2,11 +2,19 @@
 
 ## Security model
 
-Loupe is **self-hosted**: you run it, and you own the deployment and its network
-exposure. It is built for a single-admin, localhost-first workflow, with an
-explicit path to a hardened production deployment (see the checklist below). The
-defaults are tuned for zero-friction local development and are **not** safe to
-expose to a network as-is — the backend enforces that boundary at boot.
+Loupe runs in two modes. **Self-hosted** (the default) is a single-admin,
+localhost-first workflow: you run it, and you own the deployment and its network
+exposure, with an explicit path to a hardened production deployment (see the
+checklist below). The defaults are tuned for zero-friction local development and
+are **not** safe to expose to a network as-is — the backend enforces that
+boundary at boot.
+
+The optional **hosted/multi-tenant** mode adds end-user accounts (Supabase Auth;
+the backend verifies ES256/JWKS tokens) and isolates each tenant's data with
+**Postgres row-level security** — every domain row is scoped by `account_id` and
+the app serves as a non-superuser role so a query that "forgets" to filter still
+can't cross tenants. This mode is off unless `SUPABASE_URL`/`APP_DB_PASSWORD` are
+set, so self-host deploys are unaffected.
 
 ## What's already in place
 

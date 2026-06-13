@@ -91,6 +91,22 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       query string; the connection self-recycles and the client reconnects
 - [ ] Keep the core cloud-agnostic; treat GCP/Terraform as one deploy example
 
+## Hosted / multi-tenant (the SaaS path)
+
+The self-host story above stays first-class and $0. On top of it, an optional
+hosted version (free while in beta) is now live:
+
+- [x] **Tenancy + isolation** — accounts/users, every domain row scoped by
+      `account_id`, enforced with Postgres **row-level security** (a restricted
+      `loupe_app` role). Self-host stays single-tenant and unaffected.
+- [x] **End-user auth** — Supabase Auth (email/password); the backend verifies
+      the project's **ES256/JWKS** tokens and provisions the tenant just-in-time.
+      Password reset uses an emailed code (immune to link-prefetch).
+- [x] **Hosted deploy** — frontend on its own domain, backend on a dedicated API
+      subdomain (`API_DOMAIN`).
+- [ ] **Per-tenant quotas / rate-limits** and **billing** — needed before the
+      hosted version is promoted widely.
+
 ## Explicitly out of scope (for now)
 
 Multi-region / HA failover, enterprise RBAC, multi-cloud, paid integrations.

@@ -63,21 +63,6 @@ Do **not** enable `--forwarded-allow-ips` without a proxy in front: it would let
 any client spoof `X-Forwarded-For` and dodge the throttle. Narrow it to the
 proxy's address range in production rather than `"*"` where you can.
 
-## One-time: finish the rename to `loupe`
-
-The code, dashboard, SDK, compose project, and image names are already `loupe`.
-Two things live outside the repo and are done by hand when you're ready:
-
-1. **GitHub repo:** Settings → rename `cloud-ops-dashboard` → `loupe`. GitHub
-   keeps redirects from the old name, so existing clones/links keep working.
-2. **Local folder** (optional, cosmetic):
-   ```bash
-   cd ..
-   mv cloud-ops-dashboard loupe
-   ```
-   Nothing references the folder name — the compose `name: loupe` fixes the
-   container prefix regardless.
-
-Left intentionally unchanged: the internal Postgres user/db name `cloudops`.
-Renaming it would force wiping the database volume for zero user-visible benefit;
-it never appears outside the connection string.
+> The internal Postgres user/db name is `cloudops` (a historical name); it's left
+> as-is because renaming it would force wiping the database volume for zero
+> user-visible benefit — it never appears outside the connection string.

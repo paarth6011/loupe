@@ -6,7 +6,29 @@ All notable changes to Loupe are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.2.0] — 2026-06-11
+### Added
+
+- **Multi-tenancy (hosted)** — accounts + users with every domain row scoped by
+  `account_id`, isolated at the database level with Postgres **row-level
+  security** (`0010` migration; a restricted `loupe_app` role so RLS binds).
+  Self-host stays single-tenant and unaffected (leave `APP_DB_PASSWORD` empty).
+- **End-user authentication (hosted)** — email/password sign-up + sign-in via
+  Supabase Auth; the backend verifies the project's **ES256/JWKS** tokens and
+  provisions the account + user just-in-time on first request. Set `SUPABASE_URL`
+  to enable; empty keeps the self-host single-admin login.
+- **Password reset by code** — reset uses a 6-digit emailed **code** rather than a
+  magic link, so it survives email scanners that pre-fetch links and burn the
+  one-time token.
+- **Dedicated API subdomain (optional)** — `API_DOMAIN` lets the backend serve on
+  its own host (e.g. `api.example.com`) for a separately-hosted frontend; unset
+  leaves the single-host `/api` deploy unchanged.
+
+### Changed
+
+- A hosted version of Loupe is now available (free while in beta); self-hosting
+  remains a first-class, $0 option.
+
+## [0.2.0]
 
 A visual overhaul and manual alert control, plus project polish.
 
@@ -30,7 +52,7 @@ A visual overhaul and manual alert control, plus project polish.
   charts (glow lines, gradient fills, custom dark tooltips). The README now leads
   with an animated demo.
 
-## [0.1.0] — 2026-06-10
+## [0.1.0]
 
 The initial open-source release: **observability for LLM apps** — track latency,
 tokens, and cost per call, with explainable alerts, plain-English incident

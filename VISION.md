@@ -122,10 +122,11 @@ cloud hosting incurs normal infrastructure cost; self-hosting with Docker is fre
 
 ## What it is *not*
 
-Not a Datadog replacement, not multi-region/HA, not an enterprise RBAC suite, not
-a paid SaaS. The guiding principle is **the smallest thing that genuinely helps,
-is testable, and is explainable** — focused on LLM observability for individuals
-and small teams.
+Not a Datadog replacement, not multi-region/HA, not an enterprise RBAC suite. The
+guiding principle is **the smallest thing that genuinely helps, is testable, and
+is explainable** — focused on LLM observability for individuals and small teams.
+(A hosted version exists for people who'd rather not run it themselves, but
+self-hosting stays a first-class, $0 path and the project stays open-source.)
 
 ## Status
 
