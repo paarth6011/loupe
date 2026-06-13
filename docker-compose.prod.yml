@@ -96,6 +96,13 @@ services:
       - "443:443"
     environment:
       PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN (your duckdns host) in .env}
+      # Optional dedicated API subdomain (e.g. api.getloupe.net). Unset →
+      # falls back to an internal-only address so Caddy serves just the main
+      # host (no public cert issued). Set it (and point a DNS-only A record at
+      # this box) to expose the API on its own hostname for a separately-hosted
+      # SaaS frontend. The `:-` default guarantees Caddy never sees an empty
+      # site address (which would be a config error).
+      API_DOMAIN: ${API_DOMAIN:-localhost:8081}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data # persisted certs — don't lose this or you re-issue every restart
