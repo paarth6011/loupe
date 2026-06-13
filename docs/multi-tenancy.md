@@ -1,8 +1,10 @@
-# Multi-tenancy — Phase 1: tenant data model & isolation
+# Multi-tenancy — tenant data model & isolation
 
-> Status: **design / in progress.** This is the foundation for turning Loupe from
-> a single-tenant self-hosted tool into a multi-tenant product. Phase 1 is data
-> model + isolation only — **no signup UI, no billing, no auth-provider choice.**
+> Status: **shipped & live.** This is the tenant data model + Postgres
+> row-level-security isolation that powers the hosted version
+> ([getloupe.net](https://getloupe.net)). It's the foundation the rest of the
+> multi-tenant product (signup, auth, billing) builds on; self-host deploys run
+> single-tenant and are unaffected.
 
 ## Goal
 

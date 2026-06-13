@@ -6,7 +6,11 @@
 
 **Open-source observability for LLM apps** — track the latency, tokens, and cost
 of your AI calls, with explainable alerts and plain-English incident summaries.
-Self-hosted, runs for $0, no API key required.
+Self-host the whole stack for $0 with no API key — or use the hosted version.
+
+> **▶ Hosted:** prefer not to run it yourself? Loupe is also available hosted at
+> **[getloupe.net](https://getloupe.net)** — free while it's in beta. Everything
+> below covers self-hosting, which stays a first-class, $0 option.
 
 A loupe is the magnifier you use to inspect fine detail — this one shows you what
 every LLM call really costs.
