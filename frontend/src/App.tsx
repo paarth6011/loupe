@@ -5,12 +5,14 @@ import { getToken } from "./api/client";
 import { isSupabaseMode, supabase } from "./api/supabase";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import StatusPage from "./pages/StatusPage";
 
 // "checking" runs the initial auth probe (a dev auto-login attempt in admin
 // mode, or restoring a persisted Supabase session) before deciding whether to
-// show the sign-in form.
-type Phase = "checking" | "authed" | "login";
+// show the sign-in form. "recovery" is the post-reset-link "set new password"
+// screen.
+type Phase = "checking" | "authed" | "login" | "recovery";
 
 export default function App() {
   // The public status page is reachable without logging in. A tiny path check
@@ -49,11 +51,23 @@ export default function App() {
   useEffect(() => {
     if (isStatus || !isSupabaseMode || !supabase) return;
     let cancelled = false;
+    // A password-reset link returns here with `type=recovery` in the URL hash.
+    const isRecovery = window.location.hash.includes("type=recovery");
     supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) setPhase(data.session ? "authed" : "login");
+      if (cancelled) return;
+      if (isRecovery) setPhase("recovery");
+      else setPhase(data.session ? "authed" : "login");
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setPhase(session ? "authed" : "login");
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setPhase("recovery");
+        return;
+      }
+      // Stay on the reset screen until the user finishes it — the SIGNED_IN that
+      // fires when the recovery session is established must not skip past it.
+      setPhase((prev) =>
+        prev === "recovery" ? "recovery" : session ? "authed" : "login",
+      );
     });
     return () => {
       cancelled = true;
@@ -65,10 +79,14 @@ export default function App() {
 
   if (phase === "checking") {
     return (
-      <div className="login-wrap">
+      <div className="auth-wrap">
         <p className="muted">Loading…</p>
       </div>
     );
+  }
+
+  if (phase === "recovery") {
+    return <ResetPasswordPage onDone={() => setPhase("authed")} />;
   }
 
   if (phase === "login") {
