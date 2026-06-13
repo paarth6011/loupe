@@ -6,6 +6,8 @@ import {
   sendPasswordReset,
   signInWithPassword,
   signUpWithPassword,
+  updatePassword,
+  verifyRecoveryCode,
 } from "../api/auth";
 
 // Drive the component down its Supabase branch and stub the auth calls so the
@@ -16,6 +18,8 @@ vi.mock("../api/auth", () => ({
   signInWithPassword: vi.fn().mockResolvedValue(undefined),
   signUpWithPassword: vi.fn().mockResolvedValue({ needsConfirmation: false }),
   sendPasswordReset: vi.fn().mockResolvedValue(undefined),
+  verifyRecoveryCode: vi.fn().mockResolvedValue(undefined),
+  updatePassword: vi.fn().mockResolvedValue(undefined),
 }));
 
 afterEach(() => vi.clearAllMocks());
@@ -65,10 +69,32 @@ describe("LoginPage (Supabase mode)", () => {
     expect(onLogin).not.toHaveBeenCalled();
   });
 
-  it("requires an email before sending a reset", async () => {
-    render(<LoginPage onLogin={vi.fn()} />);
+  it("resets the password with an emailed code (no magic link)", async () => {
+    const onLogin = vi.fn();
+    render(<LoginPage onLogin={onLogin} />);
+
+    // The email typed on the sign-in form carries into the reset flow.
+    fill(/email/i, "user@example.com");
     fireEvent.click(screen.getByRole("button", { name: /forgot password/i }));
-    expect(screen.getByText(/enter your email first/i)).toBeInTheDocument();
-    expect(sendPasswordReset).not.toHaveBeenCalled();
+
+    // Step 1: request the code.
+    fireEvent.click(screen.getByRole("button", { name: /send reset code/i }));
+    const codeField = await screen.findByLabelText(/reset code/i);
+    expect(sendPasswordReset).toHaveBeenCalledWith("user@example.com");
+
+    // Step 2: enter the code + new password.
+    fireEvent.change(codeField, { target: { value: "123456" } });
+    fill(/new password/i, "hunter2");
+    fill(/confirm password/i, "hunter2");
+    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+
+    await waitFor(() =>
+      expect(verifyRecoveryCode).toHaveBeenCalledWith(
+        "user@example.com",
+        "123456",
+      ),
+    );
+    expect(updatePassword).toHaveBeenCalledWith("hunter2");
+    await waitFor(() => expect(onLogin).toHaveBeenCalled());
   });
 });
