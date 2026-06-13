@@ -71,9 +71,20 @@ export async function signUpWithPassword(
   return { needsConfirmation: data.session === null };
 }
 
-/** Send a password-reset email (Supabase hosts the reset page). */
+/**
+ * Send a password-reset email. The link returns the user to THIS origin (must be
+ * in Supabase's Redirect URLs allow-list); App.tsx then shows the reset screen.
+ */
 export async function sendPasswordReset(email: string): Promise<void> {
-  const { error } = await requireSupabase().auth.resetPasswordForEmail(email);
+  const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+  if (error) throw error;
+}
+
+/** Set a new password for the current (recovery) session. */
+export async function updatePassword(password: string): Promise<void> {
+  const { error } = await requireSupabase().auth.updateUser({ password });
   if (error) throw error;
 }
 

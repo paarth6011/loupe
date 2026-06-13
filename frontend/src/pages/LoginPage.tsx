@@ -7,6 +7,14 @@ import {
   signUpWithPassword,
 } from "../api/auth";
 import { isSupabaseMode } from "../api/supabase";
+import {
+  AuthButton,
+  AuthShell,
+  FormBanner,
+  LinkButton,
+  PasswordField,
+  TextField,
+} from "../components/authUi";
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   // One component, two auth modes (see api/supabase.ts). Self-host gets the
@@ -42,33 +50,28 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
   }
 
   return (
-    <div className="login-wrap">
-      <form className="login-card" onSubmit={submit}>
-        <h1>🔎 Loupe</h1>
-        <p className="muted">Sign in to your observability dashboard</p>
-        <label>
-          Username
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-        </label>
-        {error ? <div className="error-banner">{error}</div> : null}
-        <button type="submit" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
+    <AuthShell title="Welcome back" subtitle="Sign in to your dashboard">
+      <form className="auth-form" onSubmit={submit}>
+        <TextField
+          id="username"
+          label="Username"
+          value={username}
+          onChange={setUsername}
+          autoComplete="username"
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+        />
+        {error ? <FormBanner kind="error">{error}</FormBanner> : null}
+        <AuthButton busy={busy} busyLabel="Signing in…">
+          Sign in
+        </AuthButton>
       </form>
-    </div>
+    </AuthShell>
   );
 }
 
@@ -84,11 +87,15 @@ function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function resetMessages() {
+    setError(null);
+    setNotice(null);
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setError(null);
-    setNotice(null);
+    resetMessages();
     try {
       if (mode === "signup") {
         const { needsConfirmation } = await signUpWithPassword(email, password);
@@ -118,8 +125,7 @@ function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
       setError("Enter your email first, then click reset.");
       return;
     }
-    setError(null);
-    setNotice(null);
+    resetMessages();
     try {
       await sendPasswordReset(email);
       setNotice("Password reset email sent — check your inbox.");
@@ -130,73 +136,58 @@ function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
     }
   }
 
+  const isSignin = mode === "signin";
+
   return (
-    <div className="login-wrap">
-      <form className="login-card" onSubmit={submit}>
-        <h1>🔎 Loupe</h1>
-        <p className="muted">
-          {mode === "signin"
-            ? "Sign in to your observability dashboard"
-            : "Create your Loupe account"}
-        </p>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={
-              mode === "signin" ? "current-password" : "new-password"
-            }
-            required
-          />
-        </label>
-        {error ? <div className="error-banner">{error}</div> : null}
-        {notice ? <div className="notice-banner">{notice}</div> : null}
-        <button type="submit" disabled={busy}>
-          {busy
-            ? mode === "signin"
-              ? "Signing in…"
-              : "Creating account…"
-            : mode === "signin"
-              ? "Sign in"
-              : "Create account"}
-        </button>
-        <div className="login-links">
-          <button
-            type="button"
-            className="link-button"
+    <AuthShell
+      title={isSignin ? "Welcome back" : "Create your account"}
+      subtitle={
+        isSignin
+          ? "Sign in to your observability dashboard"
+          : "Start monitoring your AI workloads in minutes"
+      }
+      footer={
+        <div className="auth-links">
+          <LinkButton
             onClick={() => {
-              setMode((m) => (m === "signin" ? "signup" : "signin"));
-              setError(null);
-              setNotice(null);
+              setMode(isSignin ? "signup" : "signin");
+              resetMessages();
             }}
           >
-            {mode === "signin"
-              ? "Need an account? Sign up"
-              : "Have an account? Sign in"}
-          </button>
-          {mode === "signin" ? (
-            <button
-              type="button"
-              className="link-button"
-              onClick={resetPassword}
-            >
-              Forgot password?
-            </button>
+            {isSignin ? "Need an account? Sign up" : "Have an account? Sign in"}
+          </LinkButton>
+          {isSignin ? (
+            <LinkButton onClick={resetPassword}>Forgot password?</LinkButton>
           ) : null}
         </div>
+      }
+    >
+      <form className="auth-form" onSubmit={submit}>
+        <TextField
+          id="email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          autoComplete="email"
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          autoComplete={isSignin ? "current-password" : "new-password"}
+          hint={isSignin ? undefined : "At least 6 characters."}
+        />
+        {error ? <FormBanner kind="error">{error}</FormBanner> : null}
+        {notice ? <FormBanner kind="notice">{notice}</FormBanner> : null}
+        <AuthButton
+          busy={busy}
+          busyLabel={isSignin ? "Signing in…" : "Creating account…"}
+        >
+          {isSignin ? "Sign in" : "Create account"}
+        </AuthButton>
       </form>
-    </div>
+    </AuthShell>
   );
 }

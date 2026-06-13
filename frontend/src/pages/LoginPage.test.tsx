@@ -30,7 +30,7 @@ describe("LoginPage (Supabase mode)", () => {
     render(<LoginPage onLogin={onLogin} />);
 
     fill(/email/i, "user@example.com");
-    fill(/password/i, "hunter2");
+    fill(/^password$/i, "hunter2");
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     await waitFor(() =>
@@ -55,7 +55,7 @@ describe("LoginPage (Supabase mode)", () => {
     ).toBeInTheDocument();
 
     fill(/email/i, "new@example.com");
-    fill(/password/i, "hunter2");
+    fill(/^password$/i, "hunter2");
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() =>
