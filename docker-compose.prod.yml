@@ -57,8 +57,11 @@ services:
       # the self-host admin login is unaffected.
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
-      # Same-origin, but set it explicitly for correctness.
-      CORS_ORIGINS: ${PUBLIC_URL}
+      # Allowed CORS origins (comma-separated). Defaults to the same-origin
+      # self-host dashboard (PUBLIC_URL). Set CORS_ORIGINS in .env to add a
+      # separately-hosted frontend, e.g. a Vercel SaaS deploy:
+      #   CORS_ORIGINS=https://your-host.duckdns.org,https://your-app.vercel.app
+      CORS_ORIGINS: ${CORS_ORIGINS:-${PUBLIC_URL}}
       SUMMARY_PROVIDER: ${SUMMARY_PROVIDER:-auto}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       SUMMARY_MODEL: ${SUMMARY_MODEL:-claude-haiku-4-5}
