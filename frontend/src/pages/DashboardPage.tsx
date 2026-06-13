@@ -14,6 +14,7 @@ import CostChart, { type CostPoint } from "../components/CostChart";
 import ErrorRateChart, { type ErrorPoint } from "../components/ErrorRateChart";
 import LatencyChart, { type LatencyPoint } from "../components/LatencyChart";
 import MonitorsPanel from "../components/MonitorsPanel";
+import OnboardingPanel from "../components/OnboardingPanel";
 import SummaryCards from "../components/SummaryCards";
 import TokenChart, { type TokenPoint } from "../components/TokenChart";
 import type { Alert, CostSummary, MetricsSummary, Workload } from "../types";
@@ -66,6 +67,9 @@ export default function DashboardPage({
   showLogout?: boolean;
 }) {
   const [workloads, setWorkloads] = useState<Workload[]>([]);
+  // Whether the first workloads fetch has returned — gates the onboarding
+  // empty-state so it doesn't flash before we know the account is actually empty.
+  const [loaded, setLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [timeWindow, setTimeWindow] = useState("1h");
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
@@ -167,7 +171,8 @@ export default function DashboardPage({
         setWorkloads(wls);
         setSelectedId((cur) => cur ?? wls[0]?.id ?? null);
       })
-      .catch(handleError);
+      .catch(handleError)
+      .finally(() => setLoaded(true));
   }, []);
 
   // Reset the live series whenever the workload or window changes.
@@ -335,16 +340,22 @@ export default function DashboardPage({
 
       <main className="content">
         <section className="main-col">
-          <SummaryCards summary={summary} />
-          <LatencyChart data={latency} />
-          <ErrorRateChart data={errors} />
-          {isLlm ? (
+          {loaded && workloads.length === 0 ? (
+            <OnboardingPanel onError={handleError} />
+          ) : (
             <>
-              <CostChart data={costSeries} />
-              <TokenChart data={tokens} />
+              <SummaryCards summary={summary} />
+              <LatencyChart data={latency} />
+              <ErrorRateChart data={errors} />
+              {isLlm ? (
+                <>
+                  <CostChart data={costSeries} />
+                  <TokenChart data={tokens} />
+                </>
+              ) : null}
+              <CostBreakdown cost={cost} />
             </>
-          ) : null}
-          <CostBreakdown cost={cost} />
+          )}
         </section>
         <aside className="side-col">
           <AlertsPanel
