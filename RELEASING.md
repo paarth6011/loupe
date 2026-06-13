@@ -24,6 +24,41 @@ Pushing a `v*` tag triggers `.github/workflows/release.yml`, which:
 The images are public/private according to your GHCR package settings; make them
 public for an open-source release (Packages → package → Settings → Visibility).
 
+## Publish the SDK to PyPI
+
+The Python SDK ships separately from the app, under its own `sdk-v*` tags, so it
+versions independently. Distribution name is **`loupe-llm`** (the plain `loupe`
+was taken); the import name stays `loupe` (`pip install loupe-llm` →
+`from loupe import track`).
+
+**One-time PyPI setup (Trusted Publishing — no API token to store):**
+
+1. Create a PyPI account at <https://pypi.org>.
+2. Add a **pending** trusted publisher (the project doesn't exist on PyPI yet):
+   PyPI → your account → **Publishing** → *Add a pending publisher* with:
+   - PyPI Project Name: `loupe-llm`
+   - Owner: `paarth6011` · Repository: `loupe`
+   - Workflow name: `sdk-release.yml`
+   - Environment: `pypi`
+3. (Recommended) create a GitHub Environment named `pypi`
+   (repo → Settings → Environments) — the workflow references it. It's
+   auto-created on first run if you skip this, but an explicit one lets you add
+   approval rules.
+
+**Cut an SDK release:**
+
+1. Bump `version` in `sdk/pyproject.toml` (PyPI versions are immutable — you can
+   never re-upload the same one).
+2. Commit on `main`, then tag and push:
+   ```bash
+   git tag sdk-v0.1.0
+   git push origin sdk-v0.1.0
+   ```
+
+Pushing an `sdk-v*` tag triggers `.github/workflows/sdk-release.yml`, which builds
+the sdist + wheel from `sdk/` and publishes to PyPI via OIDC. The first run
+creates the project on PyPI (claiming the `loupe-llm` name).
+
 ## Run from published images
 
 Once published, the stack can run without building locally:
