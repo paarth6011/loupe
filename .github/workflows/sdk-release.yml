@@ -1,0 +1,37 @@
+name: Publish SDK to PyPI
+
+# Publishes the SDK (distribution `loupe-llm`, import name `loupe`) to PyPI.
+# Trigger by pushing an SDK tag, e.g.:
+#   git tag sdk-v0.1.0 && git push origin sdk-v0.1.0
+# Kept separate from the app/container release (which uses `v*` tags) so the SDK
+# versions independently. Auth is PyPI Trusted Publishing (OIDC) — no API token
+# is stored; PyPI trusts this repo + workflow directly. See RELEASING.md for the
+# one-time PyPI setup. Versions are immutable on PyPI: bump the version in
+# sdk/pyproject.toml before tagging a new release.
+on:
+  push:
+    tags: ["sdk-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # mint the OIDC token PyPI Trusted Publishing verifies
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist + wheel
+        working-directory: sdk
+        run: |
+          python -m pip install --upgrade build
+          python -m build --outdir dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sdk/dist
