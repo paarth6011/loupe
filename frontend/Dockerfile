@@ -5,7 +5,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 # Vite inlines VITE_* at build time. VITE_API_URL defaults to local; set it to the
-# backend URL when building the production image (see DEPLOYMENT.md).
+# backend URL when building the production image (see RELEASING.md).
 ARG VITE_API_URL=http://localhost:8000
 ENV VITE_API_URL=$VITE_API_URL
 # Supabase end-user auth (hosted SaaS). Leave both EMPTY for self-host — the app

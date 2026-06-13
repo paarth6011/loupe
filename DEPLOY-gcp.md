@@ -58,16 +58,18 @@ Compute Engine → **VM instances** → **Create instance**:
 - Create, then note that it shows your reserved IP.
 
 ### 5. Add your SSH key (to log in from your own terminal)
-We already generated a key pair earlier at `~/.ssh/oracle_loupe` (name is just a label —
-it works fine for GCP). GCP keys are tagged with the login username. The public key line is:
+Generate a key pair if you don't already have one (the name is just a label):
 
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/loupe_gcp -C loupe-gcp
 ```
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFE6IkN/3607suuSSEPel1ingWdTZtZ+HdE4HfgI3lF oracle-loupe
-```
+
+GCP keys are tagged with the login username. Copy your **public** key line
+(`cat ~/.ssh/loupe_gcp.pub`), then:
 
 - VM instances → click **loupe** → **Edit** → **Security and access** → **SSH Keys** →
   **Add item** → paste the line **prefixed with the username**, like:
-  `ubuntu:ssh-ed25519 AAAAC3...HfgI3lF oracle-loupe`
+  `ubuntu:ssh-ed25519 AAAA... loupe-gcp`
   (the `ubuntu:` prefix tells GCP this key logs in as user `ubuntu`) → **Save**.
 
 > **Don't want to bother with keys?** GCP's in-browser **SSH** button (next to the VM)
@@ -83,7 +85,7 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFE6IkN/3607suuSSEPel1ingWdTZtZ+HdE4HfgI3lF
 ## Part 2 — On the VM (SSH in)
 
 ```bash
-ssh -i ~/.ssh/oracle_loupe ubuntu@YOUR_STATIC_IP
+ssh -i ~/.ssh/loupe_gcp ubuntu@YOUR_STATIC_IP
 ```
 (or just click the **SSH** button in the GCP console).
 
