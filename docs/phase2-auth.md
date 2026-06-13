@@ -29,7 +29,8 @@ has landed:
 - **Config**: `frontend/.env.example` + optional `VITE_SUPABASE_*` build args in
   `frontend/Dockerfile` (empty by default → self-host stays in admin mode).
 
-**Remaining (needs your action / a Supabase project):**
+**Remaining (needs your action / a Supabase project):** the step-by-step
+operator runbook is **[`docs/phase2-setup.md`](phase2-setup.md)**. In short:
 
 1. Create the Supabase project; set `SUPABASE_JWT_SECRET` on the backend and
    `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` on the frontend build (Vercel)
