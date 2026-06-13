@@ -267,7 +267,8 @@ records latency / tokens / cost about those calls and adds no inference of its
 own. Monitoring a large LLM bill costs **$0 extra** in API fees (and ideally
 helps you *reduce* it by showing where the spend goes).
 
-> **Separate from API keys:** deploying to a cloud (e.g. the optional GCP setup
-> in `DEPLOYMENT.md`) incurs **infrastructure** cost — Cloud SQL, Memorystore,
-> Cloud Run — on the order of tens of dollars/month if left running. Self-hosting
-> with Docker Compose avoids this entirely.
+> **Separate from API keys:** the optional **managed-cloud** path (`DEPLOYMENT.md`
+> — Cloud Run + Cloud SQL + Memorystore) incurs **infrastructure** cost on the
+> order of tens of dollars/month if left running. That's a different setup from
+> the **always-free** single-VM deploy above (`DEPLOY-gcp.md` / `DEPLOY-oracle.md`)
+> and local Docker Compose, both of which cost **$0**.
