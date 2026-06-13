@@ -93,10 +93,9 @@ cp .env.prod.example .env   # set PUBLIC_URL/PUBLIC_DOMAIN + strong secrets
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Step-by-step walkthroughs on an always-free VM (no domain to buy):
-
-- **[DEPLOY-gcp.md](DEPLOY-gcp.md)** — Google Cloud `e2-micro` (always free)
-- **[DEPLOY-oracle.md](DEPLOY-oracle.md)** — Oracle Cloud Ampere ARM (always free)
+Step-by-step walkthrough on an always-free VM (no domain to buy):
+**[DEPLOY-gcp.md](DEPLOY-gcp.md)** — Google Cloud `e2-micro` (always free). The
+same single-host setup works on any small VM (e.g. Oracle Cloud's free ARM tier).
 
 The prod backend runs with `ENVIRONMENT=production`, which **requires a real
 login and refuses to boot on default secrets** — so set `JWT_SECRET` and
@@ -267,8 +266,7 @@ records latency / tokens / cost about those calls and adds no inference of its
 own. Monitoring a large LLM bill costs **$0 extra** in API fees (and ideally
 helps you *reduce* it by showing where the spend goes).
 
-> **Separate from API keys:** the optional **managed-cloud** path (`DEPLOYMENT.md`
-> — Cloud Run + Cloud SQL + Memorystore) incurs **infrastructure** cost on the
-> order of tens of dollars/month if left running. That's a different setup from
-> the **always-free** single-VM deploy above (`DEPLOY-gcp.md` / `DEPLOY-oracle.md`)
-> and local Docker Compose, both of which cost **$0**.
+> **Separate from API keys:** a paid managed-cloud setup (Cloud Run + Cloud SQL +
+> Memorystore, etc.) would carry **infrastructure** cost, but the documented paths
+> avoid it — the **always-free** single-VM deploy above (`DEPLOY-gcp.md`) and
+> local Docker Compose both cost **$0**.

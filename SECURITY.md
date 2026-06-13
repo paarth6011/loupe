@@ -49,8 +49,8 @@ putting Loupe on any reachable network:
   strong `ADMIN_PASSWORD` (and ideally a non-default `ADMIN_USERNAME`).
 - **JWT secret.** `JWT_SECRET` defaults to `change-me-in-prod`. Set a long random
   value; anyone who knows it can forge admin sessions.
-- **Secrets in env.** Don't commit real secrets. In a real deployment use a
-  secret manager (the GCP Terraform in `infra/terraform/` uses Secret Manager).
+- **Secrets in env.** Don't commit real secrets. In a real deployment prefer a
+  secret manager over plaintext env files where you can.
 - **TLS.** Terminate HTTPS in front of the services (load balancer / reverse
   proxy). The app does not do TLS itself.
 - **Reverse proxy & client IPs.** The login throttle keys on the client IP. If
@@ -60,11 +60,6 @@ putting Loupe on any reachable network:
   See [RELEASING.md](RELEASING.md) for details.
 - **Rotate ingestion keys.** Revoke keys you no longer use from the dashboard,
   and never commit them.
-- **Terraform state holds secrets.** The state stores the generated JWT signing
-  key and DB password, plus the admin password, in plaintext. Anyone who can
-  read it can forge admin tokens. Use an encrypted, access-controlled remote
-  backend (see the commented example in `infra/terraform/versions.tf`); state
-  files are already git-ignored.
 
 > **Enforced (secure by default):** `ENVIRONMENT` defaults to `production`, so the
 > backend refuses to start while `JWT_SECRET` or `ADMIN_PASSWORD` is an insecure

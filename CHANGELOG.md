@@ -28,6 +28,13 @@ All notable changes to Loupe are documented here. The format follows
 - A hosted version of Loupe is now available (free while in beta); self-hosting
   remains a first-class, $0 option.
 
+### Removed
+
+- The managed-cloud deploy path (Cloud Run + Cloud SQL + Memorystore Terraform,
+  the old `DEPLOYMENT.md` + `infra/terraform/`) and the redundant Oracle VM
+  guide. The single-VM self-host (`DEPLOY-gcp.md`) and local Docker Compose
+  remain the supported, $0 paths.
+
 ## [0.2.0]
 
 A visual overhaul and manual alert control, plus project polish.

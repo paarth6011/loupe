@@ -1,6 +1,6 @@
 # Production single-host stack: backend + Postgres + Redis + frontend, all behind
 # Caddy (which terminates HTTPS with an automatic Let's Encrypt cert). Designed
-# for one VM (e.g. an Oracle Always Free instance) — see DEPLOY-oracle.md.
+# for one VM (e.g. a GCP e2-micro free instance) — see DEPLOY-gcp.md.
 #
 #   docker compose -f docker-compose.prod.yml up -d --build
 #

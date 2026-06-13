@@ -17,7 +17,7 @@ it runs fully for $0 with no API key.
 A working full-stack monitoring stack: FastAPI + Postgres + Redis backend, React
 dashboard, an HTTP endpoint prober, threshold alerting with severity, auto-
 resolution, LLM incident summaries (pluggable, with a $0 template fallback), JWT
-auth, Docker Compose, and Terraform for an optional GCP deploy. The `POST /metrics`
+auth, Docker Compose, and a single-VM self-host guide. The `POST /metrics`
 contract is provider-agnostic, so the pivot below is mostly additive.
 
 ## Table stakes (needed before this is real OSS)
@@ -89,7 +89,7 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       fallback interval as a safety net. Because EventSource can't set headers,
       auth uses a short-lived, read-only stream ticket (not the admin JWT) in the
       query string; the connection self-recycles and the client reconnects
-- [ ] Keep the core cloud-agnostic; treat GCP/Terraform as one deploy example
+- [ ] Keep the core cloud-agnostic; treat the single-VM GCP guide as one example
 
 ## Hosted / multi-tenant (the SaaS path)
 

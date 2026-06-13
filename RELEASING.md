@@ -37,7 +37,7 @@ docker run -p 8000:8000 \
 > **Frontend note:** the frontend bakes `VITE_API_URL` at build time (Vite
 > inlines it). The published image defaults to `http://localhost:8000`, which is
 > right for a local `docker run`. For a deployed frontend, rebuild with
-> `--build-arg VITE_API_URL=https://your-backend-url` (see `DEPLOYMENT.md`).
+> `--build-arg VITE_API_URL=https://your-backend-url`.
 
 ## Deploying behind a reverse proxy
 
