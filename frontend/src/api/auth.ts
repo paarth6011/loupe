@@ -75,9 +75,9 @@ export async function signUpWithPassword(
  * Send a password-reset email. We use a 6-digit CODE rather than a magic link:
  * email scanners (Gmail in particular) pre-fetch links and burn the one-time
  * token before the user clicks, causing "otp_expired". A typed code has no URL
- * to prefetch. (The email template must surface `{{ .Token }}` and omit the
- * link — see docs/phase2-setup.md.) `redirectTo` is still passed for the
- * legacy link path, harmless when the template is code-only.
+ * to prefetch. (For this to work, the Supabase "Reset Password" email template
+ * must surface `{{ .Token }}` and omit the link.) `redirectTo` is still passed
+ * for the legacy link path, harmless when the template is code-only.
  */
 export async function sendPasswordReset(email: string): Promise<void> {
   const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
