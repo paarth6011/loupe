@@ -5,6 +5,8 @@ import {
   sendPasswordReset,
   signInWithPassword,
   signUpWithPassword,
+  updatePassword,
+  verifyRecoveryCode,
 } from "../api/auth";
 import { isSupabaseMode } from "../api/supabase";
 import {
@@ -77,7 +79,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
 
 // --- Hosted SaaS: Supabase email/password ----------------------------------
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "forgot";
 
 function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
   const [mode, setMode] = useState<Mode>("signin");
@@ -120,20 +122,17 @@ function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
     }
   }
 
-  async function resetPassword() {
-    if (!email) {
-      setError("Enter your email first, then click reset.");
-      return;
-    }
-    resetMessages();
-    try {
-      await sendPasswordReset(email);
-      setNotice("Password reset email sent — check your inbox.");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not send reset email",
-      );
-    }
+  if (mode === "forgot") {
+    return (
+      <ForgotPassword
+        initialEmail={email}
+        onBack={() => {
+          setMode("signin");
+          resetMessages();
+        }}
+        onDone={onLogin}
+      />
+    );
   }
 
   const isSignin = mode === "signin";
@@ -157,7 +156,14 @@ function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
             {isSignin ? "Need an account? Sign up" : "Have an account? Sign in"}
           </LinkButton>
           {isSignin ? (
-            <LinkButton onClick={resetPassword}>Forgot password?</LinkButton>
+            <LinkButton
+              onClick={() => {
+                setMode("forgot");
+                resetMessages();
+              }}
+            >
+              Forgot password?
+            </LinkButton>
           ) : null}
         </div>
       }
@@ -186,6 +192,137 @@ function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
           busyLabel={isSignin ? "Signing in…" : "Creating account…"}
         >
           {isSignin ? "Sign in" : "Create account"}
+        </AuthButton>
+      </form>
+    </AuthShell>
+  );
+}
+
+// Password reset via a 6-digit CODE (not a magic link) — immune to the email
+// link-prefetch that burns one-time tokens (see api/auth.ts). Step 1 emails the
+// code; step 2 verifies it and sets the new password, leaving the user signed in.
+function ForgotPassword({
+  initialEmail,
+  onBack,
+  onDone,
+}: {
+  initialEmail: string;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const [step, setStep] = useState<"request" | "reset">("request");
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function sendCode(e: FormEvent) {
+    e.preventDefault();
+    if (!email) {
+      setError("Enter your email.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await sendPasswordReset(email);
+      setStep("reset");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doReset(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords don't match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await verifyRecoveryCode(email, code.trim());
+      await updatePassword(password);
+      onDone();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Invalid or expired code — request a new one.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const back = <LinkButton onClick={onBack}>Back to sign in</LinkButton>;
+
+  if (step === "request") {
+    return (
+      <AuthShell
+        title="Reset your password"
+        subtitle="Enter your email and we'll send you a reset code."
+        footer={<div className="auth-links">{back}</div>}
+      >
+        <form className="auth-form" onSubmit={sendCode}>
+          <TextField
+            id="email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={setEmail}
+            autoComplete="email"
+          />
+          {error ? <FormBanner kind="error">{error}</FormBanner> : null}
+          <AuthButton busy={busy} busyLabel="Sending…">
+            Send reset code
+          </AuthButton>
+        </form>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell
+      title="Enter your code"
+      subtitle={`We sent a 6-digit code to ${email}. Enter it with your new password.`}
+      footer={<div className="auth-links">{back}</div>}
+    >
+      <form className="auth-form" onSubmit={doReset}>
+        <TextField
+          id="code"
+          label="Reset code"
+          value={code}
+          onChange={setCode}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+        />
+        <PasswordField
+          id="new-password"
+          label="New password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          hint="At least 6 characters."
+        />
+        <PasswordField
+          id="confirm-password"
+          label="Confirm password"
+          value={confirm}
+          onChange={setConfirm}
+          autoComplete="new-password"
+        />
+        {error ? <FormBanner kind="error">{error}</FormBanner> : null}
+        <AuthButton busy={busy} busyLabel="Resetting…">
+          Reset password
         </AuthButton>
       </form>
     </AuthShell>

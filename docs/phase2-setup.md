@@ -47,6 +47,24 @@ JWT Keys**:
 You set one or the other, not both — if `SUPABASE_URL` is set it takes the JWKS
 path.
 
+**c) Password-reset email — use a CODE, not a link.** The frontend resets
+passwords with a **6-digit code** the user types in, because email scanners
+(Gmail especially) pre-fetch magic links and burn the one-time token before the
+user clicks (`otp_expired`). For the code to appear, edit the email template:
+**Authentication → Emails → "Reset Password"** and make it surface the code and
+**remove the link** (a clickable link can still be prefetched and would consume
+the same token). Minimal body:
+
+```html
+<h2>Reset your password</h2>
+<p>Enter this code in Loupe to set a new password:</p>
+<p style="font-size:22px;font-weight:700;letter-spacing:3px">{{ .Token }}</p>
+<p>This code expires in 1 hour. If you didn't request it, ignore this email.</p>
+```
+
+(Confirmation and magic-link emails can keep `{{ .ConfirmationURL }}`; only the
+reset template needs to be code-only.)
+
 ## Step 3 — Grab the three values
 
 From **Project Settings → API**:

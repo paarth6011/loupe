@@ -139,6 +139,7 @@ export function TextField({
   value,
   onChange,
   autoComplete,
+  inputMode,
   required = true,
 }: {
   id: string;
@@ -147,6 +148,7 @@ export function TextField({
   value: string;
   onChange: (v: string) => void;
   autoComplete?: string;
+  inputMode?: "text" | "numeric" | "email";
   required?: boolean;
 }) {
   return (
@@ -161,6 +163,7 @@ export function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
+        inputMode={inputMode}
         required={required}
       />
     </div>
