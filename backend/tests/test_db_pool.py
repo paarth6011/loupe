@@ -30,8 +30,9 @@ def test_checkin_reset_swallows_dead_connection_errors():
     _reset_tenant_on_checkin(_DeadConnection(), connection_record=None)
 
 
-def test_checkin_reset_clears_the_tenant_pin_on_a_live_connection():
+def test_checkin_reset_clears_the_pin_and_commits_on_a_live_connection():
     executed: list[str] = []
+    commits = {"n": 0}
 
     class _Cursor:
         def execute(self, sql, *args, **kwargs):
@@ -44,5 +45,11 @@ def test_checkin_reset_clears_the_tenant_pin_on_a_live_connection():
         def cursor(self):
             return _Cursor()
 
+        def commit(self):
+            commits["n"] += 1
+
     _reset_tenant_on_checkin(_LiveConnection(), connection_record=None)
     assert any("set_config('app.current_account', '', false)" in s for s in executed)
+    # Must commit so the connection returns IDLE, not INTRANS — otherwise the next
+    # checkout's pool_pre_ping fails ("can't change autocommit ... INTRANS").
+    assert commits["n"] == 1

@@ -31,12 +31,22 @@ _IS_POSTGRES = engine.dialect.name == "postgresql"
 
 
 def _reset_tenant_guc(dbapi_connection) -> None:
-    """Clear the tenant pin on a raw DBAPI connection (raises if it's dead)."""
+    """Clear the tenant pin on a raw DBAPI connection (raises if it's dead).
+
+    Commit afterward so the connection re-enters the pool IDLE, not INTRANS. The
+    reset SQL opens a transaction on the (non-autocommit) connection; a connection
+    left mid-transaction makes the *next* checkout's pool_pre_ping blow up with
+    "can't change 'autocommit' now: connection in transaction status INTRANS",
+    500ing the request. The reset uses set_config(..., is_local=false) — session
+    scope — so the cleared value persists across this commit and onto the next
+    request, which is exactly what we want.
+    """
     cursor = dbapi_connection.cursor()
     try:
         cursor.execute("SELECT set_config('app.current_account', '', false)")
     finally:
         cursor.close()
+    dbapi_connection.commit()
 
 
 def _reset_tenant_on_checkin(dbapi_connection, connection_record) -> None:
