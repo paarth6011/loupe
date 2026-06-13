@@ -6,11 +6,16 @@ plain defaults so the signup flow looks like Loupe end to end.
 
 ## Files
 
-| File | Supabase template |
-|------|-------------------|
-| `confirm-signup.html` | **Confirm sign up** |
-| `reset-password.html` | **Reset password** |
-| `magic-link.html` | **Magic link or OTP** |
+| File | Supabase template | Status |
+|------|-------------------|--------|
+| `confirm-signup.html` | **Confirm sign up** | Fires on every signup |
+| `reset-password.html` | **Reset password** | Fires on every password reset |
+| `password-changed.html` | **Security → Password changed** | Notification; off by default — enable the toggle |
+| `magic-link.html` | **Magic link or OTP** | Dormant — the app doesn't use passwordless login yet |
+
+The app currently only triggers **Confirm sign up** and **Reset password**.
+`password-changed` is a security notification you opt into; `magic-link` is a
+ready-to-go template for if/when passwordless login is added.
 
 ## How to apply
 
@@ -18,6 +23,9 @@ plain defaults so the signup flow looks like Loupe end to end.
 2. Open a template (e.g. *Confirm sign up*), switch the editor to **Source / HTML**.
 3. Replace the entire contents with the matching file here and **Save**.
 4. Repeat for each template.
+
+For **Password changed**: it lives under the *Security* section and ships
+disabled — flip its toggle on, then paste `password-changed.html` into its HTML.
 
 Send yourself a real test (sign up / request a reset) to confirm rendering —
 the dashboard preview doesn't substitute the `{{ . }}` variables.
@@ -41,6 +49,9 @@ differ from the app's dark UI:
 
 ## Variables
 
-All three use only `{{ .ConfirmationURL }}` (the action link). If you switch a
-flow to OTP codes instead of links, Supabase also exposes `{{ .Token }}` — drop
-it into a styled block and point users at the in-app code entry.
+The action emails (confirm, reset, magic link) use only `{{ .ConfirmationURL }}`.
+`password-changed.html` is a notification with no action link, so it uses
+`{{ .Email }}` (personalization) and `{{ .SiteURL }}` (the "secure your account"
+link). If you switch an action flow to OTP codes instead of links, Supabase also
+exposes `{{ .Token }}` — drop it into a styled block and point users at the
+in-app code entry.
