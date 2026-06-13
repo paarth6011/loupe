@@ -1,10 +1,43 @@
 # Phase 2 — Real auth (Supabase end-user sign-in)
 
-> Status: **plan.** Phase 1 (tenancy + RLS isolation) is code-complete; the
-> backend already verifies a Supabase JWT and provisions the account/user
+> Status: **in progress.** Phase 1 (tenancy + RLS isolation) is code-complete;
+> the backend already verifies a Supabase JWT and provisions the account/user
 > just-in-time (`app/deps.py`, `app/auth.py:decode_supabase_token`). Phase 2
 > makes real people sign up and log in — almost all of the remaining work is on
 > the **frontend** and in **ops**, not the data layer.
+
+## Progress (this branch)
+
+The **build-now** slice (everything that doesn't need a live Supabase project)
+has landed:
+
+- **Frontend dual-mode** (`src/api/supabase.ts`): the presence of
+  `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` switches between Supabase mode
+  (SaaS) and the existing single-admin mode (self-host) — one bundle, no fork.
+- **Token plumbing** (`src/api/client.ts`): `apiFetch` now sources the bearer
+  token from the active mode (Supabase session or the admin localStorage token)
+  and signs out of the right one on a 401.
+- **Auth UI** (`src/pages/LoginPage.tsx`, `src/App.tsx`): email/password
+  sign-up, sign-in, and password-reset against Supabase; route gating on the
+  Supabase session (`getSession` + `onAuthStateChange`). Self-host login is
+  untouched. Covered by `LoginPage.test.tsx`.
+- **Backend tests** (`tests/test_supabase_auth.py`): verify a test-signed token
+  resolves and JIT-provisions a tenant (and reuses it for the same `sub`);
+  wrong-secret / expired / no-secret tokens are rejected.
+- **Keepalive cron** (`.github/workflows/supabase-keepalive.yml`): scheduled
+  ping of the Supabase Auth health endpoint; no-ops until the secrets are set.
+- **Config**: `frontend/.env.example` + optional `VITE_SUPABASE_*` build args in
+  `frontend/Dockerfile` (empty by default → self-host stays in admin mode).
+
+**Remaining (needs your action / a Supabase project):**
+
+1. Create the Supabase project; set `SUPABASE_JWT_SECRET` on the backend and
+   `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` on the frontend build (Vercel)
+   and the `SUPABASE_URL` / `SUPABASE_ANON_KEY` repo secrets (keepalive).
+2. Decide **email confirmation** on/off, and **shared HS256 secret vs. JWKS**
+   (see "Decisions needed" below). The current `decode_supabase_token` uses the
+   shared HS256 secret; JWKS would be a follow-up in `auth.py` only.
+3. One manual end-to-end sign-up → dashboard → logout round-trip before launch.
 
 ## Goal / definition of done
 
