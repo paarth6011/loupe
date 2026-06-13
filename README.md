@@ -106,6 +106,10 @@ login and refuses to boot on default secrets** — so set `JWT_SECRET` and
 The [`loupe` Python SDK](sdk/) wraps your Anthropic/OpenAI client so each call's
 latency, tokens, cost, and errors flow into Loupe — in two lines:
 
+```bash
+pip install loupe-llm   # distribution name; the import stays `loupe`
+```
+
 ```python
 from loupe import track
 client = track(anthropic.Anthropic(), workload="support-bot")
