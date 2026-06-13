@@ -233,6 +233,37 @@ select:hover {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
+/* Banners sit inside the card here (not the dashboard), so drop the page gutter. */
+.login-card .error-banner,
+.login-card .notice-banner {
+  margin: 0;
+}
+.notice-banner {
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.link-button:hover {
+  text-decoration: underline;
+}
 
 /* ---------- App shell ---------- */
 .app {
