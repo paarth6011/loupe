@@ -51,6 +51,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set a strong JWT_SECRET in .env}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set a strong ADMIN_PASSWORD in .env}
+      # Supabase end-user auth (Phase 2). Set SUPABASE_URL to verify the modern
+      # asymmetric (ES256/JWKS) tokens — preferred. SUPABASE_JWT_SECRET is the
+      # legacy shared-HS256 fallback. Both empty disables the path entirely, so
+      # the self-host admin login is unaffected.
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
       # Same-origin, but set it explicitly for correctness.
       CORS_ORIGINS: ${PUBLIC_URL}
       SUMMARY_PROVIDER: ${SUMMARY_PROVIDER:-auto}
@@ -71,6 +77,11 @@ services:
         # Vite bakes this at build time. The SPA calls the API under /api on the
         # same public host → same-origin, no CORS. Change PUBLIC_URL ⇒ rebuild.
         VITE_API_URL: ${PUBLIC_URL}/api
+        # Empty by default → self-host uses the single-admin login. Set BOTH to
+        # run this self-host build in Supabase mode (rebuild required). The hosted
+        # SaaS frontend is built separately on Vercel with these set.
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
     depends_on:
       - backend
     restart: unless-stopped

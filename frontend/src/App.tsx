@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 
-import { devLogin } from "./api/auth";
-import { clearToken, getToken } from "./api/client";
+import { devLogin, logout } from "./api/auth";
+import { getToken } from "./api/client";
+import { isSupabaseMode, supabase } from "./api/supabase";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import StatusPage from "./pages/StatusPage";
 
-// "checking" runs the one-shot dev auto-login probe before deciding whether to
-// show the sign-in form, so a developer's machine skips the login screen while
-// production (where /auth/dev-login 404s) falls straight through to it.
+// "checking" runs the initial auth probe (a dev auto-login attempt in admin
+// mode, or restoring a persisted Supabase session) before deciding whether to
+// show the sign-in form.
 type Phase = "checking" | "authed" | "login";
 
 export default function App() {
@@ -16,20 +17,22 @@ export default function App() {
   // keeps us from pulling in a router for a single extra route.
   const isStatus = window.location.pathname.replace(/\/$/, "") === "/status";
 
-  const [phase, setPhase] = useState<Phase>(() =>
-    getToken() ? "authed" : "checking",
-  );
-  // Whether this is a dev box (where /auth/dev-login succeeds and login is
-  // skipped). In dev there is nothing to log out of, so the dashboard hides its
-  // "Log out" button. Stays false in production, where login is real.
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (isSupabaseMode) return "checking"; // resolved by getSession() below
+    return getToken() ? "authed" : "checking";
+  });
+  // Admin mode only: whether this is a dev box (where /auth/dev-login succeeds
+  // and login is skipped). In dev there is nothing to log out of, so the
+  // dashboard hides its "Log out" button. Always false in supabase mode, where
+  // sign-out is real.
   const [devMode, setDevMode] = useState(false);
 
+  // Admin mode: probe dev-login on mount. It both decides whether to skip the
+  // sign-in form (when we have no token yet) and tells us if this is a dev box.
+  // In dev it returns a token; in production it 404s and we fall through.
   useEffect(() => {
-    if (isStatus) return;
+    if (isStatus || isSupabaseMode) return;
     let cancelled = false;
-    // Probe dev-login on mount: it both decides whether to skip the sign-in
-    // form (when we have no token yet) and tells us if this is a dev box. In
-    // dev it returns a token; in production it 404s and we fall through.
     devLogin().then((ok) => {
       if (cancelled) return;
       setDevMode(ok);
@@ -37,6 +40,24 @@ export default function App() {
     });
     return () => {
       cancelled = true;
+    };
+  }, [isStatus]);
+
+  // Supabase mode: gate on the Supabase session. getSession() restores a
+  // persisted login on reload; onAuthStateChange keeps us in sync with
+  // sign-in / sign-out / token-refresh happening anywhere in the app.
+  useEffect(() => {
+    if (isStatus || !isSupabaseMode || !supabase) return;
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled) setPhase(data.session ? "authed" : "login");
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setPhase(session ? "authed" : "login");
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
     };
   }, [isStatus]);
 
@@ -56,14 +77,13 @@ export default function App() {
 
   return (
     <DashboardPage
-      // Dev boxes skip login entirely, so there's nothing to log out of — hide
-      // the button there and only show it on a real (production) login.
-      showLogout={!devMode}
+      // Supabase mode always has a real session to end; admin dev boxes skip
+      // login entirely, so there's nothing to log out of there.
+      showLogout={isSupabaseMode || !devMode}
       onLogout={() => {
-        clearToken();
-        // Show the sign-in form on explicit logout rather than silently
-        // re-running dev auto-login (a refresh will auto-login again in dev).
-        setPhase("login");
+        // signOut() for the active mode, then show the sign-in form. (In
+        // supabase mode onAuthStateChange would also flip us to "login".)
+        void logout().then(() => setPhase("login"));
       }}
     />
   );

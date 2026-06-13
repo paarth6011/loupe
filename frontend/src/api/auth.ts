@@ -1,5 +1,8 @@
-import { apiFetch, setToken } from "./client";
+import { apiFetch, setToken, signOut } from "./client";
+import { supabase } from "./supabase";
 import type { TokenResponse } from "../types";
+
+// --- Admin mode (self-host single-admin login) -----------------------------
 
 export async function login(username: string, password: string): Promise<void> {
   const data = await apiFetch<TokenResponse>("/auth/login", {
@@ -24,4 +27,57 @@ export async function devLogin(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// --- Supabase mode (hosted SaaS end-user auth) -----------------------------
+// These talk to Supabase Auth directly; the backend never sees the password.
+// On success the Supabase client persists the session, and apiFetch picks up
+// the access token from there (see getAccessToken in client.ts). The first
+// authenticated API request JIT-provisions the account/user on the backend.
+
+function requireSupabase() {
+  if (!supabase) {
+    throw new Error("Supabase auth is not configured in this build.");
+  }
+  return supabase;
+}
+
+/** Sign in an existing user with email + password. Throws on bad credentials. */
+export async function signInWithPassword(
+  email: string,
+  password: string,
+): Promise<void> {
+  const { error } = await requireSupabase().auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Register a new user. With email confirmation enabled the returned session is
+ * null until the user clicks the emailed link; with it disabled they are signed
+ * in immediately. `needsConfirmation` tells the caller which message to show.
+ */
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+): Promise<{ needsConfirmation: boolean }> {
+  const { data, error } = await requireSupabase().auth.signUp({
+    email,
+    password,
+  });
+  if (error) throw error;
+  return { needsConfirmation: data.session === null };
+}
+
+/** Send a password-reset email (Supabase hosts the reset page). */
+export async function sendPasswordReset(email: string): Promise<void> {
+  const { error } = await requireSupabase().auth.resetPasswordForEmail(email);
+  if (error) throw error;
+}
+
+/** Mode-agnostic logout (Supabase signOut, or clears the admin token). */
+export async function logout(): Promise<void> {
+  await signOut();
 }

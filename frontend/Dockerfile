@@ -4,10 +4,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# Vite inlines VITE_API_URL at build time. Defaults to local; set to the backend
-# Cloud Run URL when building the production image (see DEPLOYMENT.md).
+# Vite inlines VITE_* at build time. VITE_API_URL defaults to local; set it to the
+# backend URL when building the production image (see DEPLOYMENT.md).
 ARG VITE_API_URL=http://localhost:8000
 ENV VITE_API_URL=$VITE_API_URL
+# Supabase end-user auth (hosted SaaS). Leave both EMPTY for self-host — the app
+# then uses the built-in single-admin login. Set both to enable Supabase sign-up.
+ARG VITE_SUPABASE_URL=
+ARG VITE_SUPABASE_ANON_KEY=
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 RUN npm run build
 
 # Unprivileged nginx: runs as non-root (uid 101), listens on $PORT (default 8080).
