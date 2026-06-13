@@ -4,8 +4,7 @@ Instrument your LLM calls and ship latency, tokens, cost, and errors to a
 [Loupe](../README.md) backend — in two lines.
 
 ```bash
-# Not yet published to PyPI — install from this repo:
-pip install ./sdk
+pip install loupe-llm   # distribution name; the import stays `loupe`
 ```
 
 ```python

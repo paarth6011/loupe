@@ -10,8 +10,6 @@ import type { ApiKeyCreated } from "../types";
 // app pointing at this backend. The snippet is pre-filled with the live API URL
 // and (once created) the real key, so it's genuine copy-paste.
 
-const REPO = "github.com/paarth6011/loupe";
-
 function CopyButton({
   text,
   label = "Copy",
@@ -70,7 +68,7 @@ export default function OnboardingPanel({
   const workload = name.trim() || "my-app";
 
   const installSnippet = [
-    `pip install "git+https://${REPO}@main#subdirectory=sdk"`,
+    "pip install loupe-llm",
     "",
     `export LOUPE_URL=${BASE_URL}`,
     `export LOUPE_API_KEY=${keyValue}`,
