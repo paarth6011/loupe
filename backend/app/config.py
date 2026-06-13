@@ -45,10 +45,15 @@ class Settings(BaseSettings):
 
     # Supabase Auth (end-user login for the multi-tenant SaaS). The frontend
     # signs users in with Supabase and forwards Supabase's access token; the
-    # backend verifies it HS256 with this secret (Supabase dashboard → Project
-    # Settings → API → JWT Secret) and maps the user to a Loupe account. The
-    # token's audience is "authenticated". Empty disables the Supabase path, so
-    # the existing self-host admin login keeps working unchanged.
+    # backend verifies it and maps the user to a Loupe account. The token's
+    # audience is "authenticated". There are two verification modes; both empty
+    # disables the Supabase path entirely, so the self-host admin login is
+    # unaffected:
+    #   - supabase_url set → ASYMMETRIC (ES256/RS256): verify against the
+    #     project's published JWKS (the modern Supabase default). Preferred.
+    #   - else supabase_jwt_secret set → legacy shared HS256 secret.
+    # supabase_url is the project URL, e.g. https://<ref>.supabase.co.
+    supabase_url: str = ""
     supabase_jwt_secret: str = ""
     supabase_jwt_aud: str = "authenticated"
 

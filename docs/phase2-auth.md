@@ -21,9 +21,14 @@ has landed:
   sign-up, sign-in, and password-reset against Supabase; route gating on the
   Supabase session (`getSession` + `onAuthStateChange`). Self-host login is
   untouched. Covered by `LoginPage.test.tsx`.
-- **Backend tests** (`tests/test_supabase_auth.py`): verify a test-signed token
-  resolves and JIT-provisions a tenant (and reuses it for the same `sub`);
-  wrong-secret / expired / no-secret tokens are rejected.
+- **Backend token verification — both modes** (`app/auth.py`): the project
+  signs end-user tokens with **ES256 (asymmetric, the Supabase default)**, so
+  `decode_supabase_token` verifies against the project's **JWKS** (fetched +
+  cached from `SUPABASE_URL`), with the legacy shared-HS256 secret kept as a
+  fallback. Covered by `tests/test_supabase_auth.py`: a test-signed token (HS256
+  *and* ES256/JWKS) resolves and JIT-provisions a tenant (reused per `sub`);
+  wrong-secret, wrong-key, expired, JWKS-unavailable, and no-config tokens are
+  all rejected.
 - **Keepalive cron** (`.github/workflows/supabase-keepalive.yml`): scheduled
   ping of the Supabase Auth health endpoint; no-ops until the secrets are set.
 - **Config**: `frontend/.env.example` + optional `VITE_SUPABASE_*` build args in
@@ -35,9 +40,9 @@ operator runbook is **[`docs/phase2-setup.md`](phase2-setup.md)**. In short:
 1. Create the Supabase project; set `SUPABASE_JWT_SECRET` on the backend and
    `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` on the frontend build (Vercel)
    and the `SUPABASE_URL` / `SUPABASE_ANON_KEY` repo secrets (keepalive).
-2. Decide **email confirmation** on/off, and **shared HS256 secret vs. JWKS**
-   (see "Decisions needed" below). The current `decode_supabase_token` uses the
-   shared HS256 secret; JWKS would be a follow-up in `auth.py` only.
+2. Decide **email confirmation** on/off (see "Decisions needed" below). The
+   HS256-vs-JWKS question is **resolved**: the project uses ES256, JWKS
+   verification is implemented, and the backend needs only `SUPABASE_URL`.
 3. One manual end-to-end sign-up → dashboard → logout round-trip before launch.
 
 ## Goal / definition of done
