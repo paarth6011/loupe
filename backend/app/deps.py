@@ -1,6 +1,7 @@
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.apikeys import verify_ingest_key
@@ -23,6 +24,22 @@ _UNAUTHORIZED = HTTPException(
 DEFAULT_ACCOUNT_NAME = "default"
 
 
+def _find_loupe_user(db: Session, sub: str, email: str | None) -> User | None:
+    """Find the existing Loupe user for a Supabase identity, read-only.
+
+    Matches on the stable Supabase id first; failing that, on email. The email
+    fallback catches the *same person under a new Supabase id* — e.g. they
+    deleted and recreated their Supabase account, minting a fresh ``sub`` for an
+    unchanged, already-confirmed email. Returns None if neither matches.
+    """
+    user = db.scalar(select(User).where(User.supabase_user_id == sub))
+    if user is not None:
+        return user
+    if email is not None:
+        return db.scalar(select(User).where(User.email == email))
+    return None
+
+
 def _provision_supabase_user(db: Session, claims: dict) -> User | None:
     """Map a verified Supabase token to a Loupe user, creating the account and
     user just-in-time on first sight. Returns None if the token has no subject.
@@ -34,24 +51,43 @@ def _provision_supabase_user(db: Session, claims: dict) -> User | None:
     sub = claims.get("sub")
     if not sub:
         return None
-    user = db.scalar(select(User).where(User.supabase_user_id == sub))
-    if user is not None:
-        return user
-    # First authenticated request from this Supabase user: stand up their tenant.
     email = claims.get("email")
-    account = Account(name=email or sub)
-    db.add(account)
-    db.flush()  # assign account.id before linking the user
-    user = User(
-        account_id=account.id,
-        supabase_user_id=sub,
-        email=email,
-        role="owner",
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+
+    user = _find_loupe_user(db, sub, email)
+    if user is not None:
+        if user.supabase_user_id != sub:
+            # Found by email, not id: the same person came back under a new
+            # Supabase identity (their account was deleted and recreated). Re-link
+            # to the new ``sub`` instead of inserting a second row — users.email is
+            # UNIQUE, so an insert would 500 *every* authenticated request (it runs
+            # through get_current_user). The email is Supabase-verified, so this is
+            # the same human keeping their existing account and data.
+            user.supabase_user_id = sub
+            db.commit()
+            db.refresh(user)
+        return user
+
+    # First time we've seen this person: stand up their tenant. Guard the insert
+    # against a race — the dashboard fires several authed requests in parallel, so
+    # two "first" requests can reach here at once; whichever loses the unique
+    # constraint rolls back and re-reads the winner's row.
+    try:
+        account = Account(name=email or sub)
+        db.add(account)
+        db.flush()  # assign account.id before linking the user
+        user = User(
+            account_id=account.id,
+            supabase_user_id=sub,
+            email=email,
+            role="owner",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+    except IntegrityError:
+        db.rollback()
+        return _find_loupe_user(db, sub, email)
 
 
 def _default_account_id(db: Session) -> int | None:

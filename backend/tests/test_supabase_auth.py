@@ -105,6 +105,37 @@ def test_provisioning_is_idempotent_per_sub(db_session: Session) -> None:
     )
 
 
+def test_provisioning_relinks_recreated_supabase_account(db_session: Session) -> None:
+    # The user deletes and recreates their Supabase account: same (verified)
+    # email, brand-new `sub`. Provisioning must re-link the existing Loupe
+    # account to the new id, NOT insert a duplicate-email row (which violates the
+    # unique constraint and 500s every authenticated request).
+    email = "recreated@example.com"
+    old_sub = str(uuid.uuid4())
+    first = deps._provision_supabase_user(
+        db_session, auth.decode_supabase_token(_make_token(sub=old_sub, email=email))
+    )
+    assert first is not None
+
+    new_sub = str(uuid.uuid4())
+    relinked = deps._provision_supabase_user(
+        db_session, auth.decode_supabase_token(_make_token(sub=new_sub, email=email))
+    )
+    assert relinked is not None
+    # Same user row and tenant — their data is preserved, just re-pointed.
+    assert relinked.id == first.id
+    assert relinked.account_id == first.account_id
+    assert relinked.supabase_user_id == new_sub
+
+    # Exactly one user for that email; no orphan account from a failed insert.
+    assert (
+        db_session.scalar(
+            select(func.count()).select_from(User).where(User.email == email)
+        )
+        == 1
+    )
+
+
 def test_resolve_bearer_scopes_to_provisioned_tenant(db_session: Session) -> None:
     sub = str(uuid.uuid4())
     token = _make_token(sub=sub, email="resolve@example.com")
