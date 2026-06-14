@@ -9,7 +9,7 @@ plain defaults so the signup flow looks like Loupe end to end.
 | File | Supabase template | Status |
 |------|-------------------|--------|
 | `confirm-signup.html` | **Confirm sign up** | Fires on every signup |
-| `reset-password.html` | **Reset password** | Fires on every password reset |
+| `reset-password.html` | **Reset password** | Fires on every password reset — shows a **6-digit code**, not a link |
 | `password-changed.html` | **Security → Password changed** | Notification; off by default — enable the toggle |
 | `magic-link.html` | **Magic link or OTP** | Dormant — the app doesn't use passwordless login yet |
 
@@ -37,21 +37,30 @@ differ from the app's dark UI:
 
 - **Light body, dark branded header.** A light card renders reliably in Outlook
   and Gmail dark mode; the dark gradient header band keeps the Loupe identity.
-- **No image or SVG logo.** Gmail strips SVG and blocks images by default, so
-  the mark is a CSS gradient chip + live "Loupe" text — it always shows, even
-  with images off. Nothing to host.
+- **Logo is a hosted PNG** (`email-logo.png`, the magnifier mark) — Gmail strips
+  SVG, so the mark must be a raster image. The live "Loupe" text sits beside it,
+  so even if a client blocks images the brand name still reads. (Gmail proxies
+  and shows images by default, so it appears for most recipients.)
 - **Bulletproof buttons.** Gradients/rounded corners are ignored by Outlook, so
   every button has a solid `#5e9bff` fallback and a VML `<v:roundrect>` for
   Outlook desktop.
-- **Plain-link fallback** under every button for clients that mangle the CTA.
 - Brand tokens mirror the app: primary `#5e9bff → #7b5cff`, Inter / JetBrains
   Mono with web-safe fallbacks (clients that strip web fonts get Arial/Menlo).
 
+### The logo asset
+
+All four templates reference `https://getloupe.net/email-logo.png`. That file is
+`frontend/public/email-logo.png`, served at the site root once the frontend is
+deployed. **The logo only appears after the frontend is deployed** with that
+asset present — until then the `<img>` 404s (and the "Loupe" text still shows).
+
 ## Variables
 
-The action emails (confirm, reset, magic link) use only `{{ .ConfirmationURL }}`.
-`password-changed.html` is a notification with no action link, so it uses
-`{{ .Email }}` (personalization) and `{{ .SiteURL }}` (the "secure your account"
-link). If you switch an action flow to OTP codes instead of links, Supabase also
-exposes `{{ .Token }}` — drop it into a styled block and point users at the
-in-app code entry.
+- **confirm-signup** and **magic-link** use `{{ .ConfirmationURL }}` (the action link).
+- **reset-password** uses `{{ .Token }}` — the 6-digit code, **not** a link. The
+  app verifies a typed code because email scanners pre-fetch links and burn the
+  one-time token (see `frontend/src/api/auth.ts` → `sendPasswordReset`). Do not
+  add a `{{ .ConfirmationURL }}` link to this template or scanners will invalidate
+  the code before the user types it.
+- **password-changed** is a notification with no action link: `{{ .Email }}`
+  (personalization) + `{{ .SiteURL }}` (the "secure your account" link).

@@ -86,6 +86,20 @@ export async function sendPasswordReset(email: string): Promise<void> {
   if (error) throw error;
 }
 
+// Verifying a recovery code establishes a real (recovery) session, which makes
+// Supabase fire SIGNED_IN. During the login-initiated reset flow that event must
+// NOT bounce the user to the dashboard — they still have to set a new password.
+// ForgotPassword raises this flag for the duration of the flow; App's auth
+// listener ignores auth events while it's set. (The link-based recovery path in
+// App is unaffected — it never sets this.)
+let _recoveryInProgress = false;
+export function setRecoveryInProgress(v: boolean): void {
+  _recoveryInProgress = v;
+}
+export function isRecoveryInProgress(): boolean {
+  return _recoveryInProgress;
+}
+
 /**
  * Exchange the emailed recovery code for a session, so the subsequent
  * updatePassword() call is authorized. Throws on a wrong/expired code.

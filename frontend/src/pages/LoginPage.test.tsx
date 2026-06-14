@@ -20,6 +20,7 @@ vi.mock("../api/auth", () => ({
   sendPasswordReset: vi.fn().mockResolvedValue(undefined),
   verifyRecoveryCode: vi.fn().mockResolvedValue(undefined),
   updatePassword: vi.fn().mockResolvedValue(undefined),
+  setRecoveryInProgress: vi.fn(),
 }));
 
 afterEach(() => vi.clearAllMocks());
@@ -82,11 +83,11 @@ describe("LoginPage (Supabase mode)", () => {
     const codeField = await screen.findByLabelText(/reset code/i);
     expect(sendPasswordReset).toHaveBeenCalledWith("user@example.com");
 
-    // Step 2: enter the code + new password.
+    // Step 2: enter the code and verify it — the password fields aren't shown
+    // until the code is accepted.
+    expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument();
     fireEvent.change(codeField, { target: { value: "123456" } });
-    fill(/new password/i, "hunter2");
-    fill(/confirm password/i, "hunter2");
-    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+    fireEvent.click(screen.getByRole("button", { name: /verify code/i }));
 
     await waitFor(() =>
       expect(verifyRecoveryCode).toHaveBeenCalledWith(
@@ -94,7 +95,35 @@ describe("LoginPage (Supabase mode)", () => {
         "123456",
       ),
     );
-    expect(updatePassword).toHaveBeenCalledWith("hunter2");
+    // Password not set yet — only the code has been verified.
+    expect(updatePassword).not.toHaveBeenCalled();
+
+    // Step 3: now the password fields appear; set the new password.
+    fill(/new password/i, "hunter2");
+    fill(/confirm password/i, "hunter2");
+    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+
+    await waitFor(() => expect(updatePassword).toHaveBeenCalledWith("hunter2"));
     await waitFor(() => expect(onLogin).toHaveBeenCalled());
+  });
+
+  it("rejects a wrong code before asking for a new password", async () => {
+    vi.mocked(verifyRecoveryCode).mockRejectedValueOnce(new Error("bad code"));
+    render(<LoginPage onLogin={vi.fn()} />);
+
+    fill(/email/i, "user@example.com");
+    fireEvent.click(screen.getByRole("button", { name: /forgot password/i }));
+    fireEvent.click(screen.getByRole("button", { name: /send reset code/i }));
+    const codeField = await screen.findByLabelText(/reset code/i);
+
+    fireEvent.change(codeField, { target: { value: "000000" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify code/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/bad code/i)).toBeInTheDocument(),
+    );
+    // Stayed on the code step; never advanced to the password fields.
+    expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument();
+    expect(updatePassword).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import {
   login,
   sendPasswordReset,
+  setRecoveryInProgress,
   signInWithPassword,
   signUpWithPassword,
   updatePassword,
@@ -199,8 +200,10 @@ function SupabaseLogin({ onLogin }: { onLogin: () => void }) {
 }
 
 // Password reset via a 6-digit CODE (not a magic link) — immune to the email
-// link-prefetch that burns one-time tokens (see api/auth.ts). Step 1 emails the
-// code; step 2 verifies it and sets the new password, leaving the user signed in.
+// link-prefetch that burns one-time tokens (see api/auth.ts). Three steps:
+// (1) email the code, (2) verify the code, then — only once it's accepted —
+// (3) set the new password. Verifying first means the user never types a new
+// password against a wrong/expired code.
 function ForgotPassword({
   initialEmail,
   onBack,
@@ -210,13 +213,20 @@ function ForgotPassword({
   onBack: () => void;
   onDone: () => void;
 }) {
-  const [step, setStep] = useState<"request" | "reset">("request");
+  const [step, setStep] = useState<"request" | "code" | "password">("request");
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Verifying the code establishes a recovery session; flag it so App's auth
+  // listener doesn't bounce us to the dashboard before the password is set.
+  useEffect(() => {
+    setRecoveryInProgress(true);
+    return () => setRecoveryInProgress(false);
+  }, []);
 
   async function sendCode(e: FormEvent) {
     e.preventDefault();
@@ -228,7 +238,7 @@ function ForgotPassword({
     setError(null);
     try {
       await sendPasswordReset(email);
-      setStep("reset");
+      setStep("code");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send the code");
     } finally {
@@ -236,7 +246,29 @@ function ForgotPassword({
     }
   }
 
-  async function doReset(e: FormEvent) {
+  async function verifyCode(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!code.trim()) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await verifyRecoveryCode(email, code.trim());
+      setStep("password");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Invalid or expired code — request a new one.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setNewPassword(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (password.length < 6) {
@@ -249,14 +281,11 @@ function ForgotPassword({
     }
     setBusy(true);
     try {
-      await verifyRecoveryCode(email, code.trim());
       await updatePassword(password);
       onDone();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Invalid or expired code — request a new one.",
+        err instanceof Error ? err.message : "Could not update password",
       );
     } finally {
       setBusy(false);
@@ -290,21 +319,38 @@ function ForgotPassword({
     );
   }
 
+  if (step === "code") {
+    return (
+      <AuthShell
+        title="Enter your code"
+        subtitle={`We sent a 6-digit code to ${email}. Enter it to continue.`}
+        footer={<div className="auth-links">{back}</div>}
+      >
+        <form className="auth-form" onSubmit={verifyCode}>
+          <TextField
+            id="code"
+            label="Reset code"
+            value={code}
+            onChange={setCode}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+          />
+          {error ? <FormBanner kind="error">{error}</FormBanner> : null}
+          <AuthButton busy={busy} busyLabel="Verifying…">
+            Verify code
+          </AuthButton>
+        </form>
+      </AuthShell>
+    );
+  }
+
   return (
     <AuthShell
-      title="Enter your code"
-      subtitle={`We sent a 6-digit code to ${email}. Enter it with your new password.`}
+      title="Set a new password"
+      subtitle="Your code is verified — choose a new password."
       footer={<div className="auth-links">{back}</div>}
     >
-      <form className="auth-form" onSubmit={doReset}>
-        <TextField
-          id="code"
-          label="Reset code"
-          value={code}
-          onChange={setCode}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-        />
+      <form className="auth-form" onSubmit={setNewPassword}>
         <PasswordField
           id="new-password"
           label="New password"
