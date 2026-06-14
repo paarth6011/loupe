@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { devLogin, logout } from "./api/auth";
+import { devLogin, isRecoveryInProgress, logout } from "./api/auth";
 import { getToken } from "./api/client";
 import { isSupabaseMode, supabase } from "./api/supabase";
 import DashboardPage from "./pages/DashboardPage";
@@ -59,6 +59,10 @@ export default function App() {
       else setPhase(data.session ? "authed" : "login");
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // A login-initiated password reset (enter-code → set-password) drives its
+      // own screens. Ignore auth events while it runs so the recovery session it
+      // creates doesn't skip the user past the "set new password" step.
+      if (isRecoveryInProgress()) return;
       if (event === "PASSWORD_RECOVERY") {
         setPhase("recovery");
         return;
