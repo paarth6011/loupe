@@ -29,6 +29,14 @@ function fill(label: RegExp, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
+// Type a code into the segmented OtpInput, one digit per box.
+async function enterCode(code: string) {
+  const boxes = await screen.findAllByLabelText(/verification code digit/i);
+  code.split("").forEach((d, i) => {
+    fireEvent.change(boxes[i], { target: { value: d } });
+  });
+}
+
 describe("LoginPage (Supabase mode)", () => {
   it("signs in with email + password and notifies the parent", async () => {
     const onLogin = vi.fn();
@@ -80,13 +88,13 @@ describe("LoginPage (Supabase mode)", () => {
 
     // Step 1: request the code.
     fireEvent.click(screen.getByRole("button", { name: /send reset code/i }));
-    const codeField = await screen.findByLabelText(/reset code/i);
+    await screen.findAllByLabelText(/verification code digit/i);
     expect(sendPasswordReset).toHaveBeenCalledWith("user@example.com");
 
     // Step 2: enter the code and verify it — the password fields aren't shown
     // until the code is accepted.
     expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument();
-    fireEvent.change(codeField, { target: { value: "123456" } });
+    await enterCode("123456");
     fireEvent.click(screen.getByRole("button", { name: /verify code/i }));
 
     await waitFor(() =>
@@ -114,9 +122,7 @@ describe("LoginPage (Supabase mode)", () => {
     fill(/email/i, "user@example.com");
     fireEvent.click(screen.getByRole("button", { name: /forgot password/i }));
     fireEvent.click(screen.getByRole("button", { name: /send reset code/i }));
-    const codeField = await screen.findByLabelText(/reset code/i);
-
-    fireEvent.change(codeField, { target: { value: "000000" } });
+    await enterCode("000000");
     fireEvent.click(screen.getByRole("button", { name: /verify code/i }));
 
     await waitFor(() =>

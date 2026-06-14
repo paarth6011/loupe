@@ -349,6 +349,37 @@ select:hover {
   color: var(--muted);
 }
 
+.otp-row {
+  display: flex;
+  gap: 8px;
+}
+.otp-box {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 52px;
+  text-align: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  caret-color: var(--primary);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.otp-box:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.otp-box:not(:placeholder-shown),
+.otp-box[value]:not([value=""]) {
+  border-color: var(--border-strong);
+}
+
 .auth-banner {
   display: flex;
   align-items: flex-start;

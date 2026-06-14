@@ -15,6 +15,7 @@ import {
   AuthShell,
   FormBanner,
   LinkButton,
+  OtpInput,
   PasswordField,
   TextField,
 } from "../components/authUi";
@@ -327,13 +328,11 @@ function ForgotPassword({
         footer={<div className="auth-links">{back}</div>}
       >
         <form className="auth-form" onSubmit={verifyCode}>
-          <TextField
+          <OtpInput
             id="code"
-            label="Reset code"
+            label="Verification code"
             value={code}
             onChange={setCode}
-            inputMode="numeric"
-            autoComplete="one-time-code"
           />
           {error ? <FormBanner kind="error">{error}</FormBanner> : null}
           <AuthButton busy={busy} busyLabel="Verifying…">
