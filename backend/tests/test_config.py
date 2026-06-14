@@ -87,3 +87,18 @@ def test_blocker_wildcard_cors():
 def test_production_blockers_includes_insecure_defaults():
     s = Settings(jwt_secret=INSECURE_JWT_SECRET, admin_password=INSECURE_ADMIN_PASSWORD)
     assert len(s.production_blockers()) == 2
+
+
+def test_retention_noop_only_under_restricted_role():
+    # Enabled + restricted role => prune would silently no-op under RLS (warn).
+    assert _secure_base(
+        retention_days=30, app_db_password="pw"
+    ).retention_silently_noops()
+    # Disabled => nothing to warn about.
+    assert not _secure_base(
+        retention_days=0, app_db_password="pw"
+    ).retention_silently_noops()
+    # Owner connection (dev / single-tenant) => prune works, no warning.
+    assert not _secure_base(
+        retention_days=30, app_db_password=""
+    ).retention_silently_noops()

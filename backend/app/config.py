@@ -140,6 +140,15 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment.strip().lower() in {"prod", "production"}
 
+    def retention_silently_noops(self) -> bool:
+        """True when retention is enabled AND the app serves on the restricted
+        role. There, the prune routine runs on an unpinned connection, which
+        row-level security scopes to zero rows, so the sweep deletes NOTHING — it
+        only works on the owner connection (dev / single-tenant), where RLS is
+        bypassed. A tripwire for this is logged at startup; the real fix is to run
+        prune on the privileged connection. See retention.prune_old_data."""
+        return self.retention_days > 0 and bool(self.app_db_password)
+
     def multitenant_enabled(self) -> bool:
         """True when end-user (Supabase) auth is configured — i.e. the deployment
         can provision more than one tenant. The self-host admin login on its own
