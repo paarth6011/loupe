@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     # Comma-separated allowed CORS origins (frontend URL in prod).
     cors_origins: str = "http://localhost:5173"
 
+    # Number of trusted reverse-proxy hops in front of the app. 0 (default) means
+    # the app is directly exposed, so per-client identity (e.g. for login rate
+    # limiting) comes from the socket peer and any client-supplied X-Forwarded-For
+    # is ignored. Behind the prod Caddy stack this is 1: the client IP is the
+    # entry Caddy appended to X-Forwarded-For (one hop from the right), which a
+    # client cannot spoof. Set it to the real number of trusted proxies.
+    trusted_proxy_hops: int = 0
+
     # Auth
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"

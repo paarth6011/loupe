@@ -112,3 +112,35 @@ def test_login_success_resets_failure_counter(client):
     # Counter cleared, so a fresh run of failures starts from zero (still 401).
     again = client.post("/auth/login", json={"username": "admin", "password": "nope"})
     assert again.status_code == 401
+
+
+# --- Client IP resolution for rate limiting -----------------------------------
+
+
+class _FakeRequest:
+    def __init__(self, xff: str | None, peer: str | None) -> None:
+        self.headers = {"x-forwarded-for": xff} if xff is not None else {}
+        self.client = type("C", (), {"host": peer})() if peer is not None else None
+
+
+def test_client_ip_uses_socket_peer_when_untrusted():
+    from app.routers.auth import _client_ip
+
+    # hops=0: ignore any X-Forwarded-For (directly exposed); use the peer.
+    req = _FakeRequest(xff="1.2.3.4", peer="10.0.0.9")
+    assert _client_ip(req, 0) == "10.0.0.9"
+
+
+def test_client_ip_cannot_be_spoofed_through_one_proxy():
+    from app.routers.auth import _client_ip
+
+    # Client forged "1.1.1.1"; our single trusted proxy appended the real client.
+    req = _FakeRequest(xff="1.1.1.1, 9.9.9.9", peer="172.18.0.2")
+    assert _client_ip(req, 1) == "9.9.9.9"
+
+
+def test_client_ip_falls_back_when_xff_missing():
+    from app.routers.auth import _client_ip
+
+    req = _FakeRequest(xff=None, peer="10.0.0.9")
+    assert _client_ip(req, 1) == "10.0.0.9"

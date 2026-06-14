@@ -21,7 +21,25 @@ _LOGIN_MAX_FAILURES = 10
 _LOGIN_WINDOW_SECONDS = 300
 
 
-def _client_ip(request: Request) -> str:
+def _client_ip(request: Request, trusted_proxy_hops: int) -> str:
+    """The client's IP for rate-limiting.
+
+    Behind a reverse proxy (Caddy in the prod stack), ``request.client.host`` is
+    the proxy, so every client would share one bucket — letting one attacker lock
+    everyone out, and giving no per-attacker isolation. When ``trusted_proxy_hops``
+    is > 0 we instead take the X-Forwarded-For entry that many hops from the right:
+    the address our own trusted proxy appended. A client can only prepend entries
+    (further left), so it cannot forge this one. Defaults to 0 (use the socket
+    peer) so a directly-exposed instance never trusts a client-supplied header.
+    """
+    if trusted_proxy_hops > 0:
+        parts = [
+            p.strip()
+            for p in request.headers.get("x-forwarded-for", "").split(",")
+            if p.strip()
+        ]
+        if parts:
+            return parts[max(0, len(parts) - trusted_proxy_hops)]
     return request.client.host if request.client else "unknown"
 
 
@@ -30,8 +48,9 @@ def login(
     body: LoginRequest,
     request: Request,
     cache: Cache = Depends(get_cache),
+    settings: Settings = Depends(get_settings),
 ) -> TokenResponse:
-    key = f"login_fail:{_client_ip(request)}"
+    key = f"login_fail:{_client_ip(request, settings.trusted_proxy_hops)}"
     if int(cache.get(key) or 0) >= _LOGIN_MAX_FAILURES:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
