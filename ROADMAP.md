@@ -42,8 +42,10 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       **Per-account channels:** each tenant sets its own Slack/Discord webhook
       from the dashboard (validated to an https Slack/Discord host so a
       tenant-supplied URL can't be an SSRF vector); the global
-      `NOTIFY_WEBHOOK_URL` remains the self-host fallback. Email/native channels
-      and richer Block Kit/embed formatting later
+      `NOTIFY_WEBHOOK_URL` remains the self-host fallback. Slack messages render
+      as colored Block Kit attachments and Discord as colored embeds (per-severity
+      color, green on resolve), with untrusted fields escaped and mentions
+      disabled. Email channels later
 
 ## LLM-observability features (the niche)
 
