@@ -3,7 +3,29 @@
 # On first start Caddy obtains a Let's Encrypt cert for this domain over HTTP-01,
 # so ports 80 AND 443 must be reachable from the internet.
 
+# Security headers applied at the edge (Caddy is the only internet-facing hop, so
+# this covers both the SPA and the API without duplicating headers downstream).
+# HSTS isn't added by Caddy automatically; the rest harden clickjacking, MIME
+# sniffing, referrer leakage, and feature access. CSP is set per-site below.
+(sec_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
 {$PUBLIC_DOMAIN} {
+	import sec_headers
+	# SPA CSP: the Vite build has no inline scripts, so script-src 'self' blocks
+	# injected scripts; styles allow inline (charts) + Google Fonts; connect-src
+	# 'self' covers the same-origin /api, plus any https backend a self-hoster
+	# points at. object/base/frame-ancestors are locked down.
+	header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https:"
+
 	# API under /api/* → backend. handle_path strips the /api prefix, so the
 	# backend sees its normal routes (/auth/login, /metrics, /events, …).
 	handle_path /api/* {
@@ -30,6 +52,10 @@
 # internal-only address that never receives public traffic — keeping the block
 # valid without issuing a real cert.
 {$API_DOMAIN:localhost:8081} {
+	import sec_headers
+	# API-only host: responses are JSON, never a document, so lock the CSP all the
+	# way down (a strict policy is harmless on non-HTML and adds defense in depth).
+	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 	reverse_proxy backend:8080 {
 		flush_interval -1
 	}
