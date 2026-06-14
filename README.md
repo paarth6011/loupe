@@ -220,10 +220,17 @@ ticket** and passes that in the query string — so the full admin token never
 lands in a URL or proxy log. Each connection self-recycles every few minutes and
 the client reconnects with a fresh ticket.
 
-**Alert notifications:** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
-webhook to get pinged when an alert fires or resolves. The payload includes
-`text` (Slack), `content` (Discord), and structured `alert` fields; empty
-disables notifications.
+**Alert notifications:** get pinged in Slack or Discord when an alert fires or
+resolves. The payload includes `text` (Slack), `content` (Discord), and
+structured `alert` fields. Two ways to configure the destination:
+
+- **Per account (hosted/multi-tenant):** each account sets its own Slack or
+  Discord webhook from the dashboard (**Notifications**); alerts route to that
+  tenant's channel. The URL is validated to an https Slack/Discord host so a
+  tenant-supplied URL can't be used as an SSRF vector.
+- **Global (self-host):** set `NOTIFY_WEBHOOK_URL` to a Slack/Discord/generic
+  webhook. It's the fallback for any account without its own URL; empty disables
+  notifications. A per-account URL always takes precedence.
 
 ## Costs & API keys
 

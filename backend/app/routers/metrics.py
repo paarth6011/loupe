@@ -13,7 +13,7 @@ from app.config import Settings, get_settings
 from app.database import get_db, get_session_factory
 from app.deps import get_current_user, require_ingest_auth
 from app.models import MetricSample, Workload
-from app.notifications import AlertEvent, Notifier, get_notifier
+from app.notifications import AlertEvent, Notifier, notifier_for_account
 from app.pricing import compute_cost
 from app.schemas.auth import CurrentUser
 from app.schemas.metrics import (
@@ -36,6 +36,21 @@ from app.summarizer import (
 MAX_BUCKETS = 500
 
 router = APIRouter(tags=["metrics"])
+
+
+def get_account_notifier(
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    account_id: int = Depends(require_ingest_auth),
+) -> Notifier:
+    """Per-tenant notifier: routes this account's alerts to its own webhook.
+
+    A dependency (not an inline call) so tests can override it with a capturing
+    notifier, the way they already override the summarizer and cache. The nested
+    ``require_ingest_auth`` is cached within the request, so the account is
+    resolved once.
+    """
+    return notifier_for_account(db, account_id, settings)
 
 
 def _latency_percentiles(
@@ -114,7 +129,7 @@ def ingest_metric(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     summarizer: Summarizer = Depends(get_summarizer),
-    notifier: Notifier = Depends(get_notifier),
+    notifier: Notifier = Depends(get_account_notifier),
     session_factory: sessionmaker = Depends(get_session_factory),
     account_id: int = Depends(require_ingest_auth),
 ) -> MetricIngestResponse:
