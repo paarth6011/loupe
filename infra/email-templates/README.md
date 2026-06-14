@@ -49,7 +49,9 @@ differ from the app's dark UI:
 
 ### The logo asset
 
-All four templates reference `https://getloupe.net/email-logo.png`. That file is
+All four templates reference `https://www.getloupe.net/email-logo.png` (the
+canonical host — the apex `getloupe.net` 308-redirects to `www`, and not every
+mail client follows redirects on an `<img>`). That file is
 `frontend/public/email-logo.png`, served at the site root once the frontend is
 deployed. **The logo only appears after the frontend is deployed** with that
 asset present — until then the `<img>` 404s (and the "Loupe" text still shows).
