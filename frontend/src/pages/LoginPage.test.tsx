@@ -122,13 +122,18 @@ describe("LoginPage (Supabase mode)", () => {
   });
 
   it("gates Resend behind a cooldown, then re-sends the code", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Pure fake timers (no wall-clock coupling) so the chained-setTimeout
+    // countdown advances deterministically; advanceTimersByTimeAsync flushes the
+    // microtasks between ticks (and the async send/setStep promises).
+    vi.useFakeTimers();
     try {
       render(<LoginPage onLogin={vi.fn()} />);
       fill(/email/i, "user@example.com");
       fireEvent.click(screen.getByRole("button", { name: /forgot password/i }));
       fireEvent.click(screen.getByRole("button", { name: /send reset code/i }));
-      await screen.findAllByLabelText(/verification code digit/i);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
       expect(sendPasswordReset).toHaveBeenCalledTimes(1);
 
       // Right after sending, Resend is gated: a countdown replaces the link.
@@ -136,14 +141,18 @@ describe("LoginPage (Supabase mode)", () => {
       expect(screen.queryByRole("button", { name: /^resend$/i })).toBeNull();
 
       // Once the cooldown elapses the link returns and sends a fresh code. The
-      // countdown chains a setTimeout per second, so pump it a tick at a time.
+      // countdown chains one setTimeout per second through React's scheduler, so
+      // advance a second at a time, flushing the re-render between each tick.
       for (let i = 0; i < 30; i++) {
         await act(async () => {
-          vi.advanceTimersByTime(1000);
+          await vi.advanceTimersByTimeAsync(1000);
         });
       }
       fireEvent.click(screen.getByRole("button", { name: /^resend$/i }));
-      await waitFor(() => expect(sendPasswordReset).toHaveBeenCalledTimes(2));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(sendPasswordReset).toHaveBeenCalledTimes(2);
       expect(screen.getByText(/we sent a new code/i)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
