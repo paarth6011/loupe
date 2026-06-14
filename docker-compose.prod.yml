@@ -62,6 +62,11 @@ services:
       # separately-hosted frontend, e.g. a Vercel SaaS deploy:
       #   CORS_ORIGINS=https://your-host.duckdns.org,https://your-app.vercel.app
       CORS_ORIGINS: ${CORS_ORIGINS:-${PUBLIC_URL}}
+      # One trusted proxy hop (Caddy) sits in front of the backend, so the real
+      # client IP for login rate-limiting is the entry Caddy appends to
+      # X-Forwarded-For. Without this, every client shares the proxy's IP (one
+      # attacker could lock out everyone with 10 failed logins).
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
       SUMMARY_PROVIDER: ${SUMMARY_PROVIDER:-auto}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       SUMMARY_MODEL: ${SUMMARY_MODEL:-claude-haiku-4-5}
