@@ -116,3 +116,12 @@ export interface TokenResponse {
   access_token: string;
   token_type: string;
 }
+
+export interface NotificationSettings {
+  webhook_url: string | null;
+}
+
+export interface NotificationTestResult {
+  ok: boolean;
+  detail: string;
+}

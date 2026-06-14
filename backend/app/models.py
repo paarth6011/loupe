@@ -29,6 +29,11 @@ class Account(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     plan: Mapped[str] = mapped_column(String(32), nullable=False, server_default="free")
+    # Per-tenant Slack/Discord webhook for alert notifications. Null -> fall back
+    # to the global NOTIFY_WEBHOOK_URL (self-host) or send nothing (hosted). Set
+    # via the dashboard; validated to an https Slack/Discord host (see
+    # schemas/notifications.py) so a tenant-supplied URL can't be an SSRF vector.
+    notify_webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

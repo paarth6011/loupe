@@ -38,8 +38,12 @@ contract is provider-agnostic, so the pivot below is mostly additive.
       per-workload enable/disable + threshold overrides for every rule
       (`GET`/`PUT /workloads/{id}/monitors`), merged over the global defaults; a
       settings modal in the dashboard. Env vars remain the defaults
-- [x] Notifications — webhook (Slack/Discord/generic) on alert fire & resolve
-      (`NOTIFY_WEBHOOK_URL`); email/native channels later
+- [x] Notifications — Slack/Discord/generic webhook on alert fire & resolve.
+      **Per-account channels:** each tenant sets its own Slack/Discord webhook
+      from the dashboard (validated to an https Slack/Discord host so a
+      tenant-supplied URL can't be an SSRF vector); the global
+      `NOTIFY_WEBHOOK_URL` remains the self-host fallback. Email/native channels
+      and richer Block Kit/embed formatting later
 
 ## LLM-observability features (the niche)
 

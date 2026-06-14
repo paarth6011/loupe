@@ -1150,6 +1150,25 @@ select:hover {
   flex: 1;
   font-family: inherit;
 }
+.notif-actions {
+  display: flex;
+  gap: 8px;
+}
+.notif-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+.notif-ok,
+.notif-fail {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+.notif-ok {
+  color: #34d399;
+}
+.notif-fail {
+  color: var(--danger, #f87171);
+}
 .key-reveal {
   background: rgba(52, 211, 153, 0.08);
   border: 1px solid rgba(52, 211, 153, 0.4);

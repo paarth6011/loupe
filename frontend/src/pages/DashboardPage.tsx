@@ -14,6 +14,7 @@ import CostChart, { type CostPoint } from "../components/CostChart";
 import ErrorRateChart, { type ErrorPoint } from "../components/ErrorRateChart";
 import LatencyChart, { type LatencyPoint } from "../components/LatencyChart";
 import MonitorsPanel from "../components/MonitorsPanel";
+import NotificationsPanel from "../components/NotificationsPanel";
 import OnboardingPanel from "../components/OnboardingPanel";
 import SummaryCards from "../components/SummaryCards";
 import TokenChart, { type TokenPoint } from "../components/TokenChart";
@@ -82,6 +83,7 @@ export default function DashboardPage({
   const [error, setError] = useState<string | null>(null);
   const [showMonitors, setShowMonitors] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   // Manual alert resolve: which alert is mid-request (to disable its button),
   // and the most recently resolved alert offering a brief Undo.
   const [resolvingId, setResolvingId] = useState<number | null>(null);
@@ -317,6 +319,13 @@ export default function DashboardPage({
           <Icon path="M2 18v3h3l8.5-8.5M21 7.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
           API keys
         </button>
+        <button
+          className="secondary"
+          onClick={() => setShowNotifications(true)}
+        >
+          <Icon path="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
+          Notifications
+        </button>
         {showLogout ? <button onClick={onLogout}>Log out</button> : null}
       </header>
 
@@ -332,6 +341,13 @@ export default function DashboardPage({
       {showKeys ? (
         <ApiKeysPanel
           onClose={() => setShowKeys(false)}
+          onError={handleError}
+        />
+      ) : null}
+
+      {showNotifications ? (
+        <NotificationsPanel
+          onClose={() => setShowNotifications(false)}
           onError={handleError}
         />
       ) : null}

@@ -18,7 +18,8 @@ from app import models as _models  # noqa: F401  (register tables on Base.metada
 from app.cache import InMemoryCache, get_cache
 from app.database import Base, get_db, get_session_factory
 from app.main import app
-from app.notifications import AlertEvent, get_notifier
+from app.notifications import AlertEvent
+from app.routers.metrics import get_account_notifier
 from app.summarizer import AlertContext, get_summarizer
 
 
@@ -121,7 +122,7 @@ def client(
     app.dependency_overrides[get_cache] = lambda: cache
     app.dependency_overrides[get_session_factory] = lambda: test_session_factory
     app.dependency_overrides[get_summarizer] = lambda: fake_summarizer
-    app.dependency_overrides[get_notifier] = lambda: notifier
+    app.dependency_overrides[get_account_notifier] = lambda: notifier
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
