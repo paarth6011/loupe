@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 // Shared building blocks for the auth screens (sign in / sign up / reset).
 // SVG icons only (no emoji), labelled inputs, 44px touch targets, visible focus,
@@ -166,6 +166,106 @@ export function TextField({
         inputMode={inputMode}
         required={required}
       />
+    </div>
+  );
+}
+
+/**
+ * Segmented one-time-code input: `length` single-digit boxes that auto-advance
+ * as you type, step back on Backspace, and accept a pasted code into any box.
+ * `value` is the joined string; only digits are kept.
+ */
+export function OtpInput({
+  id,
+  label,
+  value,
+  onChange,
+  length = 6,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  length?: number;
+}) {
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+
+  function focusBox(i: number) {
+    refs.current[Math.max(0, Math.min(i, length - 1))]?.focus();
+  }
+
+  // Overwrite from box `start` with `digits`, returning the next empty index.
+  function fillFrom(start: number, digits: string) {
+    const arr = value.padEnd(length, " ").slice(0, length).split("");
+    let j = start;
+    for (const d of digits) {
+      if (j >= length) break;
+      arr[j] = d;
+      j += 1;
+    }
+    onChange(arr.join("").replace(/ /g, "").slice(0, length));
+    return j;
+  }
+
+  function handleChange(i: number, raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) {
+      // A non-digit / cleared box: blank just this slot.
+      const arr = value.padEnd(length, " ").slice(0, length).split("");
+      arr[i] = " ";
+      onChange(arr.join("").replace(/ /g, "").slice(0, length));
+      return;
+    }
+    const next = fillFrom(i, digits);
+    focusBox(next);
+  }
+
+  function handleKeyDown(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !value[i] && i > 0) {
+      e.preventDefault();
+      fillFrom(i - 1, " ");
+      focusBox(i - 1);
+    } else if (e.key === "ArrowLeft" && i > 0) {
+      focusBox(i - 1);
+    } else if (e.key === "ArrowRight" && i < length - 1) {
+      focusBox(i + 1);
+    }
+  }
+
+  function handlePaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
+    const digits = e.clipboardData.getData("text").replace(/\D/g, "");
+    if (!digits) return;
+    e.preventDefault();
+    focusBox(fillFrom(i, digits));
+  }
+
+  return (
+    <div className="field">
+      <span className="field-label" id={`${id}-label`}>
+        {label}
+      </span>
+      <div className="otp-row" role="group" aria-labelledby={`${id}-label`}>
+        {Array.from({ length }, (_, i) => (
+          <input
+            key={i}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            id={`${id}-${i}`}
+            className="otp-box"
+            type="text"
+            inputMode="numeric"
+            autoComplete={i === 0 ? "one-time-code" : "off"}
+            maxLength={1}
+            value={value[i] ?? ""}
+            aria-label={`${label} digit ${i + 1}`}
+            onChange={(e) => handleChange(i, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(i, e)}
+            onPaste={(e) => handlePaste(i, e)}
+            onFocus={(e) => e.target.select()}
+          />
+        ))}
+      </div>
     </div>
   );
 }
