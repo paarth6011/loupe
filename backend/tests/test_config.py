@@ -47,3 +47,43 @@ def test_environment_defaults_to_production():
     # that never sets ENVIRONMENT fails closed (refuses insecure secrets, hides
     # /auth/dev-login) instead of silently running in permissive dev mode.
     assert Settings.model_fields["environment"].default == "prod"
+
+
+def _secure_base(**overrides) -> Settings:
+    """A production-safe Settings, overridable per test."""
+    base = dict(jwt_secret="a-long-random-secret-value", admin_password="s3cret-pw!")
+    base.update(overrides)
+    return Settings(**base)
+
+
+def test_multitenant_enabled_detection():
+    assert _secure_base().multitenant_enabled() is False
+    assert _secure_base(supabase_url="https://x.supabase.co").multitenant_enabled()
+    assert _secure_base(supabase_jwt_secret="legacy-hs256").multitenant_enabled()
+
+
+def test_blocker_multitenant_without_restricted_role():
+    # Supabase on but no APP_DB_PASSWORD => app would bypass RLS. Must block boot.
+    s = _secure_base(supabase_url="https://proj.supabase.co", app_db_password="")
+    blockers = s.production_blockers()
+    assert any("APP_DB_PASSWORD" in b for b in blockers)
+
+
+def test_no_blocker_multitenant_with_restricted_role():
+    s = _secure_base(supabase_url="https://proj.supabase.co", app_db_password="pw")
+    assert s.production_blockers() == []
+
+
+def test_no_blocker_single_tenant_without_restricted_role():
+    # Self-host single-tenant (no Supabase) doesn't need the restricted role.
+    assert _secure_base(app_db_password="").production_blockers() == []
+
+
+def test_blocker_wildcard_cors():
+    s = _secure_base(cors_origins="https://app.example.com, *")
+    assert any("CORS_ORIGINS" in b for b in s.production_blockers())
+
+
+def test_production_blockers_includes_insecure_defaults():
+    s = Settings(jwt_secret=INSECURE_JWT_SECRET, admin_password=INSECURE_ADMIN_PASSWORD)
+    assert len(s.production_blockers()) == 2
