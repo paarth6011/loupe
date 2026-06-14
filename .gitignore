@@ -15,6 +15,8 @@ venv/
 node_modules/
 dist/
 frontend/.vite/
+# TypeScript incremental build cache (emitted by `tsc -b`)
+*.tsbuildinfo
 
 # OS / editor
 .DS_Store
