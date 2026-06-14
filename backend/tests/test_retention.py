@@ -103,3 +103,28 @@ def test_admin_prune_endpoint(client, auth_headers):
 
 def test_admin_prune_requires_auth(client):
     assert client.post("/admin/prune?days=1").status_code == 401
+
+
+def test_require_admin_allows_operator():
+    # The self-host admin login carries no user_id (it isn't a Supabase end user).
+    from app.deps import require_admin
+    from app.schemas.auth import CurrentUser
+
+    operator = CurrentUser(account_id=1, username="admin")
+    assert require_admin(operator) is operator
+
+
+def test_require_admin_rejects_tenant():
+    # A provisioned Supabase end user (has a user_id) must not run operator actions.
+    import pytest
+    from fastapi import HTTPException
+
+    from app.deps import require_admin
+    from app.schemas.auth import CurrentUser
+
+    tenant = CurrentUser(
+        account_id=2, user_id=5, email="t@example.com", username="t@example.com"
+    )
+    with pytest.raises(HTTPException) as exc:
+        require_admin(tenant)
+    assert exc.value.status_code == 403

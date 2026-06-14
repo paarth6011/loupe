@@ -162,3 +162,21 @@ def require_ingest_auth(
             set_current_account(db, user.account_id)
             return user.account_id
     raise _UNAUTHORIZED
+
+
+def require_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """Authorize the self-host operator for deployment-wide actions (e.g. data
+    retention pruning).
+
+    The admin login maps to the single ``default`` account and carries no
+    ``user_id``; provisioned Supabase end users always have one. So a tenant on
+    the multi-tenant SaaS calling an operator endpoint is refused with 403 — a
+    destructive, cross-tenant action (prune deletes by time across all tenants)
+    must never be reachable by an ordinary tenant.
+    """
+    if user.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="operator privileges required",
+        )
+    return user
