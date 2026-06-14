@@ -132,6 +132,16 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment.strip().lower() in {"prod", "production"}
 
+    def multitenant_enabled(self) -> bool:
+        """True when end-user (Supabase) auth is configured — i.e. the deployment
+        can provision more than one tenant. The self-host admin login on its own
+        is single-tenant (everything resolves to the default account)."""
+        return bool(self.supabase_url.strip() or self.supabase_jwt_secret.strip())
+
+    def cors_origin_list(self) -> list[str]:
+        """Configured CORS origins, trimmed and de-blanked."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     def insecure_defaults(self) -> list[str]:
         """Return human-readable descriptions of any insecure default in use."""
         problems: list[str] = []
@@ -139,6 +149,36 @@ class Settings(BaseSettings):
             problems.append("JWT_SECRET is the insecure default")
         if self.admin_password == INSECURE_ADMIN_PASSWORD:
             problems.append("ADMIN_PASSWORD is the insecure default 'admin'")
+        return problems
+
+    def production_blockers(self) -> list[str]:
+        """Fatal misconfigurations that must prevent boot in production.
+
+        A superset of insecure_defaults() plus checks that only bite once real
+        traffic/tenants are served. Returned (not raised) so it stays unit
+        testable; main.py raises on any non-empty result.
+        """
+        problems = list(self.insecure_defaults())
+        # Multi-tenant isolation is enforced by Postgres row-level security, which
+        # only binds when the app connects as the restricted (NOSUPERUSER,
+        # NOBYPASSRLS) role — i.e. when APP_DB_PASSWORD is set. With Supabase auth
+        # on but no restricted role, the app serves as the privileged owner and
+        # RLS is silently bypassed, so any tenant could read another's rows.
+        if self.multitenant_enabled() and not self.app_db_password:
+            problems.append(
+                "multi-tenant auth is enabled (SUPABASE_URL / SUPABASE_JWT_SECRET) "
+                "but APP_DB_PASSWORD is unset: the app would serve as the privileged "
+                "database role, so Postgres row-level security would NOT bind and "
+                "tenants could read each other's data. Set APP_DB_PASSWORD to the "
+                "restricted role's password"
+            )
+        # allow_credentials=True with a wildcard origin is the classic unsafe CORS
+        # combination — it would let any site make credentialed calls to the API.
+        if "*" in self.cors_origin_list():
+            problems.append(
+                "CORS_ORIGINS contains '*', which is unsafe with credentialed "
+                "requests; list explicit frontend origins instead"
+            )
         return problems
 
 

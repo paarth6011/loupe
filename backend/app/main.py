@@ -22,25 +22,32 @@ from app.routers import (
 
 _settings = get_settings()
 
-# Fail closed: never run a production deployment on the insecure dev defaults.
-_insecure = _settings.insecure_defaults()
-if _insecure:
-    message = "; ".join(_insecure)
-    if _settings.is_production():
+# Fail closed: never run a production deployment on a fatal misconfiguration —
+# insecure dev secrets, multi-tenant auth without the restricted DB role (which
+# would silently disable row-level security), or wildcard CORS. In dev we only
+# warn about the insecure secrets so the local stack stays frictionless.
+if _settings.is_production():
+    _blockers = _settings.production_blockers()
+    if _blockers:
         raise RuntimeError(
-            f"Refusing to start in production with insecure defaults: {message}. "
-            "Set ENVIRONMENT=dev to override, or provide JWT_SECRET / ADMIN_PASSWORD."
+            "Refusing to start in production: "
+            + "; ".join(_blockers)
+            + ". Set ENVIRONMENT=dev to override for local development."
         )
-    logging.getLogger("uvicorn.error").warning(
-        "Running with insecure development defaults (%s). "
-        "Do NOT use these in production.",
-        message,
-    )
+else:
+    _insecure = _settings.insecure_defaults()
+    if _insecure:
+        logging.getLogger("uvicorn.error").warning(
+            "Running with insecure development defaults (%s). "
+            "Do NOT use these in production.",
+            "; ".join(_insecure),
+        )
 
 app = FastAPI(title="Loupe API", version="0.1.0")
 
 # Allowed origins come from config (localhost in dev; the frontend URL in prod).
-_origins = [o.strip() for o in _settings.cors_origins.split(",") if o.strip()]
+# A wildcard origin is refused at boot in production (see production_blockers).
+_origins = _settings.cors_origin_list()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
