@@ -96,3 +96,26 @@ def test_patch_workload_requires_auth(client, auth_headers):
     wls = client.get("/workloads", headers=auth_headers).json()
     wid = next(w["id"] for w in wls if w["name"] == "needs-auth-svc")
     assert client.patch(f"/workloads/{wid}", json={"public": True}).status_code == 401
+
+
+def test_status_excludes_other_tenants_public_workloads(
+    client, auth_headers, db_session
+):
+    # The public status page is scoped to the default account. A *different*
+    # tenant's public workload must never appear on it — even on a deploy where
+    # RLS is bypassed, the explicit account_id filter keeps tenants from leaking
+    # onto one shared page.
+    from app.models import Account, Workload
+
+    _ingest(client, auth_headers, "mine-svc")
+    _make_public(client, auth_headers, "mine-svc")
+
+    other = Account(name="other-tenant")
+    db_session.add(other)
+    db_session.flush()
+    db_session.add(Workload(account_id=other.id, name="other-svc", public=True))
+    db_session.commit()
+
+    names = [c["name"] for c in client.get("/status").json()["components"]]
+    assert names == ["mine-svc"]
+    assert "other-svc" not in names
