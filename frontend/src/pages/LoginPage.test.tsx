@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import LoginPage from "./LoginPage";
@@ -113,6 +119,35 @@ describe("LoginPage (Supabase mode)", () => {
 
     await waitFor(() => expect(updatePassword).toHaveBeenCalledWith("hunter2"));
     await waitFor(() => expect(onLogin).toHaveBeenCalled());
+  });
+
+  it("gates Resend behind a cooldown, then re-sends the code", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<LoginPage onLogin={vi.fn()} />);
+      fill(/email/i, "user@example.com");
+      fireEvent.click(screen.getByRole("button", { name: /forgot password/i }));
+      fireEvent.click(screen.getByRole("button", { name: /send reset code/i }));
+      await screen.findAllByLabelText(/verification code digit/i);
+      expect(sendPasswordReset).toHaveBeenCalledTimes(1);
+
+      // Right after sending, Resend is gated: a countdown replaces the link.
+      expect(screen.getByText(/resend in/i)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^resend$/i })).toBeNull();
+
+      // Once the cooldown elapses the link returns and sends a fresh code. The
+      // countdown chains a setTimeout per second, so pump it a tick at a time.
+      for (let i = 0; i < 30; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(1000);
+        });
+      }
+      fireEvent.click(screen.getByRole("button", { name: /^resend$/i }));
+      await waitFor(() => expect(sendPasswordReset).toHaveBeenCalledTimes(2));
+      expect(screen.getByText(/we sent a new code/i)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("rejects a wrong code before asking for a new password", async () => {

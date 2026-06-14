@@ -220,7 +220,11 @@ function ForgotPassword({
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Throttle "Resend": a countdown gates the link so a user can't fire off a
+  // burst of code emails (each one invalidates the previous, and they cost us).
+  const [cooldown, setCooldown] = useState(0);
 
   // Verifying the code establishes a recovery session; flag it so App's auth
   // listener doesn't bounce us to the dashboard before the password is set.
@@ -228,6 +232,13 @@ function ForgotPassword({
     setRecoveryInProgress(true);
     return () => setRecoveryInProgress(false);
   }, []);
+
+  // Tick the resend cooldown down to zero, one second at a time.
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   async function sendCode(e: FormEvent) {
     e.preventDefault();
@@ -240,8 +251,30 @@ function ForgotPassword({
     try {
       await sendPasswordReset(email);
       setStep("code");
+      setCooldown(30);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send the code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Re-send the code from the entry screen. Gated by the cooldown so it can't be
+  // spammed; on success we restart the timer and confirm via an aria-live notice.
+  async function resend() {
+    if (cooldown > 0 || busy) return;
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      await sendPasswordReset(email);
+      setCode("");
+      setNotice("We sent a new code — check your inbox.");
+      setCooldown(30);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not resend the code",
+      );
     } finally {
       setBusy(false);
     }
@@ -250,6 +283,7 @@ function ForgotPassword({
   async function verifyCode(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     if (!code.trim()) {
       setError("Enter the 6-digit code from your email.");
       return;
@@ -335,9 +369,18 @@ function ForgotPassword({
             onChange={setCode}
           />
           {error ? <FormBanner kind="error">{error}</FormBanner> : null}
+          {notice ? <FormBanner kind="notice">{notice}</FormBanner> : null}
           <AuthButton busy={busy} busyLabel="Verifying…">
             Verify code
           </AuthButton>
+          <p className="auth-resend">
+            Didn't receive a code?{" "}
+            {cooldown > 0 ? (
+              <span className="auth-resend-wait">Resend in {cooldown}s</span>
+            ) : (
+              <LinkButton onClick={resend}>Resend</LinkButton>
+            )}
+          </p>
         </form>
       </AuthShell>
     );
