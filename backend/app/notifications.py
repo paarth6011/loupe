@@ -89,9 +89,7 @@ def get_notifier() -> Notifier:
     return WebhookNotifier(url) if url else NullNotifier()
 
 
-def notifier_for_account(
-    db: Session, account_id: int, settings: Settings
-) -> Notifier:
+def notifier_for_account(db: Session, account_id: int, settings: Settings) -> Notifier:
     """Resolve the notifier for one tenant. Precedence: the account's own webhook
     URL, else the global NOTIFY_WEBHOOK_URL (the self-host default), else a no-op.
 
@@ -100,9 +98,7 @@ def notifier_for_account(
     webhook. The URL is read here (on the request's pinned session) and captured
     into the notifier, so background delivery needs no DB/account context.
     """
-    url = db.scalar(
-        select(Account.notify_webhook_url).where(Account.id == account_id)
-    )
+    url = db.scalar(select(Account.notify_webhook_url).where(Account.id == account_id))
     if url:
         return WebhookNotifier(url)
     if settings.notify_webhook_url:
