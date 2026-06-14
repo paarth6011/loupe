@@ -68,6 +68,19 @@ app.include_router(admin.router)
 app.include_router(events.router)
 app.include_router(status.router)
 
+# Tripwire: retention is enabled but the app serves on the restricted role, so
+# the sweep runs under RLS on an unpinned connection and silently deletes nothing
+# (see Settings.retention_silently_noops). Surface it loudly instead of letting a
+# future operator believe retention is keeping the disk bounded when it isn't.
+if _settings.retention_silently_noops():
+    logging.getLogger("uvicorn.error").warning(
+        "RETENTION_DAYS=%d but the app serves on the restricted DB role: the "
+        "retention sweep runs under row-level security on an unpinned connection "
+        "and will delete NOTHING. Run prune on the privileged (owner) connection "
+        "to enable deployment-wide retention.",
+        _settings.retention_days,
+    )
+
 # Background data retention (no-op unless RETENTION_DAYS > 0).
 start_retention_worker(
     SessionLocal, _settings.retention_days, _settings.retention_sweep_hours
