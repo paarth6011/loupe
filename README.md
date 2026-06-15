@@ -175,7 +175,8 @@ automatically on first boot.
 
 ### API surface
 
-- `GET  /health`
+- `GET  /health` — liveness probe (no auth)
+- `GET  /ready` — readiness probe: checks Postgres + Redis are reachable
 - `POST /auth/login` → JWT
 - `POST /metrics` (auth: API key via `X-API-Key`, or admin JWT) — ingest a sample; evaluates thresholds on insert
 - `POST /apikeys` · `GET /apikeys` · `DELETE /apikeys/{id}` (admin JWT) — manage ingestion keys
@@ -189,6 +190,9 @@ automatically on first boot.
 - `POST /alerts/{id}/resolve` · `POST /alerts/{id}/reopen` (auth) — manually resolve an alert (e.g. one whose workload went quiet) or undo that
 - `GET  /workloads/{id}/monitors` (auth) — every rule's effective config for a workload
 - `PUT  /workloads/{id}/monitors/{rule}` (auth) — enable/disable or override a rule's threshold
+- `GET  /notifications` · `PUT /notifications` (auth) — get/set the account's Slack/Discord alert webhook (URL validated to an https Slack/Discord host)
+- `POST /notifications/test` (auth) — send a sample alert to confirm the webhook works
+- `POST /admin/prune?days=N` (operator) — trigger a data-retention sweep on demand
 - `POST /auth/stream-ticket` (auth) — exchange the admin token for a short-lived, read-only ticket for the live stream
 - `GET  /events?ticket=<ticket>` — Server-Sent Events stream; pushes a `changed` event when new data lands so the dashboard refetches without fixed-interval polling
 
@@ -278,6 +282,11 @@ stale resolved alerts older than that many days. A background sweep runs every
 `RETENTION_SWEEP_HOURS`; `POST /admin/prune?days=N` (operator) triggers it on
 demand. Aggregation (summary, cost, timeseries) runs in SQL, so these endpoints
 scale with the table rather than loading it into the app.
+
+So retention (and history in general) can't be dodged by back- or future-dating:
+an ingested sample whose client-supplied `ts` is more than
+`INGEST_MAX_FUTURE_SKEW_SECONDS` (default `300`) seconds in the future is
+rejected (`0` disables the check).
 
 ## Costs & API keys
 
