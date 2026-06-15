@@ -254,7 +254,6 @@ select:hover {
   font-size: 14px;
   line-height: 1.55;
   color: var(--text-dim);
-  max-width: 42ch;
 }
 
 /* A mini dashboard panel — the same accent rule, mono figures and live pulse. */
