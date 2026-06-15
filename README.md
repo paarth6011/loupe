@@ -50,9 +50,9 @@ every LLM call really costs.*
 </details>
 
 **Jump to:** [Is Loupe for me?](#is-loupe-for-me) · [Quickstart](#quickstart) ·
-[Instrument your app](#instrument-your-app-sdk) · [Self-host for $0](#self-host-for-0) ·
-[Services & API](#services--ports) · [Configuration](#configuration) ·
-[Costs & API keys](#costs--api-keys)
+[See it run locally](#see-it-run-locally) · [Instrument your app](#instrument-your-app-sdk) ·
+[Self-host for $0](#self-host-for-0) · [Services & API](#services--ports) ·
+[Configuration](#configuration) · [Costs & API keys](#costs--api-keys)
 
 ## Is Loupe for me?
 
@@ -92,6 +92,34 @@ HTTP endpoints (latency + up/down), so the charts and alerts populate in seconds
 ```bash
 docker compose --profile demo up -d   # adds the prober (canned demo data)
 ```
+
+## See it run locally
+
+From an empty box to a live dashboard in two terminals — entirely on your own
+machine, no cloud account and no API key required.
+
+**1 · Launch the stack.** One command builds and starts the database, backend, and
+dashboard:
+
+![Launching Loupe with docker compose](docs/screenshots/local-walkthrough/01-launch-terminal.png)
+
+**2 · Open the dashboard.** It's live at **http://localhost:5173** and starts
+empty, with a step-by-step *"connect your first app"* guide:
+
+![Empty Loupe dashboard at localhost:5173](docs/screenshots/local-walkthrough/02-empty-dashboard.png)
+
+**3 · Send it some calls.** Create an ingestion key, point the SDK at Loupe, and
+your app's LLM calls flow in. *(Here a tiny generator stands in for a real app; the
+`ANTHROPIC_API_KEY` is your app's own provider key — Loupe never needs one of its
+own.)*
+
+![Seeding sample data from the terminal](docs/screenshots/local-walkthrough/03-seed-terminal.png)
+
+**4 · Watch it fill in.** Latency (p50/p95), error rate, token throughput,
+cost-per-model and per-workload, and explainable alerts — all updating live over
+SSE:
+
+![Populated Loupe dashboard with charts, spend breakdown, and alerts](docs/screenshots/local-walkthrough/04-populated-dashboard.png)
 
 ## Instrument your app (SDK)
 
