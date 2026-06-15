@@ -198,13 +198,163 @@ select:hover {
   display: grid;
   place-items: center;
   padding: 24px;
-  /* A soft brand glow anchored top-centre, behind the card. */
+  /* The same top-right brand glow the dashboard body uses, so the auth screens
+     sit in the same world. */
   background: radial-gradient(
-    760px 420px at 50% -8%,
+    1000px 520px at 80% -10%,
     rgba(94, 155, 255, 0.1),
-    transparent 70%
+    transparent 64%
   );
 }
+/* Showcase (left) paired with the form card (right). Collapses to one column —
+   just the card — below the breakpoint. */
+.auth-grid {
+  width: 100%;
+  max-width: 940px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  align-items: stretch;
+  gap: 28px;
+}
+
+.auth-aside {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 34px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background:
+    radial-gradient(
+      560px 280px at 0% 0%,
+      rgba(123, 92, 255, 0.13),
+      transparent 60%
+    ),
+    linear-gradient(165deg, var(--surface-2), var(--surface) 70%);
+  box-shadow: var(--shadow-2);
+  animation: auth-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-brand.auth-brand-aside {
+  justify-content: flex-start;
+  margin-bottom: 0;
+}
+.auth-aside-title {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.auth-aside-sub {
+  margin: 13px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  max-width: 42ch;
+}
+
+/* A mini dashboard panel — the same accent rule, mono figures and live pulse. */
+.auth-preview {
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: rgba(15, 18, 24, 0.6);
+  padding: 13px 14px 15px;
+  box-shadow: var(--shadow-1);
+}
+.auth-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.auth-preview-bar {
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--primary);
+  opacity: 0.85;
+}
+.auth-preview-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green);
+}
+.auth-preview-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: auth-pulse 2s ease-out infinite;
+}
+@keyframes auth-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(52, 211, 153, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+.auth-spark {
+  display: block;
+  width: 100%;
+  height: 70px;
+}
+.auth-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 13px;
+}
+.auth-stat {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 9px 11px;
+}
+.auth-stat::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--stat-accent, var(--primary));
+  opacity: 0.7;
+}
+.auth-stat-label {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+.auth-stat-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
 .auth-card {
   width: 400px;
   max-width: 100%;
@@ -216,6 +366,10 @@ select:hover {
   box-shadow: var(--shadow-2);
   overflow: hidden;
   animation: auth-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* On wide screens the showcase carries the brand; hide the card's copy. */
+.auth-brand.auth-brand-card {
+  display: none;
 }
 /* A hairline gradient accent along the card's top edge. */
 .auth-card::before {
@@ -494,13 +648,31 @@ select:hover {
   color: var(--muted);
 }
 
+/* Below this width the showcase drops away and the form card stands alone,
+   carrying the brand itself. */
+@media (max-width: 860px) {
+  .auth-grid {
+    grid-template-columns: minmax(0, 400px);
+    justify-content: center;
+  }
+  .auth-aside {
+    display: none;
+  }
+  .auth-brand.auth-brand-card {
+    display: flex;
+  }
+}
 @media (max-width: 420px) {
   .auth-card {
     padding: 28px 22px 24px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .auth-card {
+  .auth-card,
+  .auth-aside {
+    animation: none;
+  }
+  .auth-preview-dot {
     animation: none;
   }
   .spinner {
