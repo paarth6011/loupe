@@ -26,3 +26,7 @@ frontend/.vite/
 # AI assistant scratch / local context
 CLAUDE.md
 .claude/
+
+# Local-only planning docs (kept on disk, not published to the repo)
+VISION.md
+ROADMAP.md

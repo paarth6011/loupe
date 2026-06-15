@@ -17,8 +17,7 @@ every LLM call really costs.
 
 > **Status:** the full pipeline works today on real data — ingest → aggregate →
 > alert → summarize → visualize, including LLM cost/token tracking and the
-> two-line instrumentation SDK. See **[VISION.md](VISION.md)** for the vision and
-> **[ROADMAP.md](ROADMAP.md)** for what's next.
+> two-line instrumentation SDK.
 
 ## Demo
 
