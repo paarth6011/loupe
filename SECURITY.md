@@ -54,10 +54,11 @@ putting Loupe on any reachable network:
 - **TLS.** Terminate HTTPS in front of the services (load balancer / reverse
   proxy). The app does not do TLS itself.
 - **Reverse proxy & client IPs.** The login throttle keys on the client IP. If
-  you run behind a proxy or load balancer, start uvicorn with `--proxy-headers`
-  and a trusted `--forwarded-allow-ips` so it sees the real client IP — otherwise
-  every request appears to come from the proxy and the throttle is ineffective.
-  See [RELEASING.md](RELEASING.md) for details.
+  you run behind a proxy or load balancer, set **`TRUSTED_PROXY_HOPS`** to the
+  number of proxies in front (the bundled Caddy stack defaults it to `1`) so the
+  throttle reads the real client from `X-Forwarded-For` instead of the proxy's
+  address — otherwise every request shares one bucket and the throttle is
+  ineffective. See [RELEASING.md](RELEASING.md) for details.
 - **Rotate ingestion keys.** Revoke keys you no longer use from the dashboard,
   and never commit them.
 

@@ -76,27 +76,35 @@ docker run -p 8000:8000 \
 
 ## Deploying behind a reverse proxy
 
-The login brute-force throttle (`/auth/login`) keys on the client IP via
-`request.client.host`. With the default setup that's correct — the frontend
-nginx serves only static files, so browsers reach the backend directly and the
-IP is the real client.
+The login brute-force throttle (`/auth/login`) keys on the client IP. With the
+default local setup that's the real client — the frontend nginx serves only
+static files, so browsers reach the backend directly.
 
 If you put the backend **behind a reverse proxy or load balancer** (nginx,
 Cloud Run, an ALB, etc.), every request appears to come from the proxy's IP
 instead. The throttle then counts all clients against one shared counter — so a
 single attacker can lock everyone out, and the per-IP limit is effectively
-meaningless. When (and only when) a trusted proxy sits in front, start uvicorn
-so it honors the forwarded client IP:
+meaningless. Two env knobs — **already wired into `backend/start.sh` and
+`docker-compose.prod.yml`, so you set env vars, not edit files** — make the
+backend see the real client behind a trusted proxy:
 
-```sh
-# backend/start.sh — add the proxy flags
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8080}" \
-     --proxy-headers --forwarded-allow-ips="*"
-```
+- **`TRUSTED_PROXY_HOPS`** — the number of trusted proxies between the client and
+  the app. The throttle then takes the `X-Forwarded-For` entry that many hops
+  from the right (the address *your* proxy appended), which a client can't forge
+  by prepending its own. The bundled single-host Caddy stack sets this to `1`
+  (the compose default), so the throttle already sees the real client. Set it to
+  your proxy count if you front the backend differently; `0` (the code default,
+  used in plain local dev where the browser hits the backend directly) means
+  "use the socket peer."
+- **`FORWARDED_ALLOW_IPS`** — which immediate peers uvicorn trusts to honor
+  `X-Forwarded-*` headers (defaults to `127.0.0.1`), so anything reading
+  `request.client.host` also sees the forwarded IP. Set it to the proxy's
+  address, or `"*"` **only** when a trusted proxy is the *only* way to reach the
+  container (e.g. Cloud Run, where Google's front end fronts it).
 
-Do **not** enable `--forwarded-allow-ips` without a proxy in front: it would let
-any client spoof `X-Forwarded-For` and dodge the throttle. Narrow it to the
-proxy's address range in production rather than `"*"` where you can.
+Do **not** set `TRUSTED_PROXY_HOPS > 0` or widen `FORWARDED_ALLOW_IPS` without a
+trusted proxy actually in front: it would let any client spoof `X-Forwarded-For`
+and dodge the throttle.
 
 > The internal Postgres user/db name is `cloudops` (a historical name); it's left
 > as-is because renaming it would force wiping the database volume for zero
