@@ -1,4 +1,4 @@
-import { apiFetch, setToken, signOut } from "./client";
+import { ApiError, apiFetch, setToken, signOut } from "./client";
 import { supabase } from "./supabase";
 import type { TokenResponse } from "../types";
 
@@ -12,21 +12,44 @@ export async function login(username: string, password: string): Promise<void> {
   setToken(data.access_token);
 }
 
+// How hard to try the dev-login probe before falling back to the sign-in form.
+// Total attempts = DEV_LOGIN_RETRIES + 1, with a linear backoff between them.
+const DEV_LOGIN_RETRIES = 4;
+const DEV_LOGIN_BACKOFF_MS = 300;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Attempt the frictionless dev login. The backend issues a token without
  * credentials only in non-production environments; in production it 404s and we
  * fall back to the normal sign-in form. Returns whether a token was obtained.
+ *
+ * Right after `docker compose up` the backend may still be warming up, so the
+ * first probe can hit connection-refused or a 5xx from a half-ready server. We
+ * retry those transient failures with a short backoff so a cold start doesn't
+ * briefly bounce the developer to the sign-in screen. A real 404 is the
+ * production signal ("this endpoint does not exist here") — never retried; we
+ * fall straight back to the login form.
  */
 export async function devLogin(): Promise<boolean> {
-  try {
-    const data = await apiFetch<TokenResponse>("/auth/dev-login", {
-      method: "POST",
-    });
-    setToken(data.access_token);
-    return true;
-  } catch {
-    return false;
+  for (let attempt = 0; attempt <= DEV_LOGIN_RETRIES; attempt++) {
+    try {
+      const data = await apiFetch<TokenResponse>("/auth/dev-login", {
+        method: "POST",
+      });
+      setToken(data.access_token);
+      return true;
+    } catch (err) {
+      // 404 means we're not on a dev box (production) — stop immediately.
+      if (err instanceof ApiError && err.status === 404) return false;
+      // Otherwise it's transient (backend still booting); back off and retry.
+      if (attempt < DEV_LOGIN_RETRIES) {
+        await sleep(DEV_LOGIN_BACKOFF_MS * (attempt + 1));
+      }
+    }
   }
+  return false;
 }
 
 // --- Supabase mode (hosted SaaS end-user auth) -----------------------------
