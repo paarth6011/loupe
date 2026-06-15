@@ -100,7 +100,116 @@ function InfoIcon() {
   );
 }
 
-/** Centered card with the gradient brand mark, a title and optional subtitle. */
+/** The gradient magnifier mark + wordmark, reused by the card and the showcase. */
+function BrandLockup({ className }: { className?: string }) {
+  return (
+    <div className={`auth-brand${className ? ` ${className}` : ""}`}>
+      <span className="auth-mark">
+        <MagnifierIcon />
+      </span>
+      <span className="auth-wordmark">Loupe</span>
+    </div>
+  );
+}
+
+/** One KPI chip echoing the dashboard cards (accent rule + mono figure). */
+function StatChip({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <div
+      className="auth-stat"
+      style={{ ["--stat-accent" as string]: accent } as React.CSSProperties}
+    >
+      <span className="auth-stat-label">{label}</span>
+      <span className="auth-stat-value num">{value}</span>
+    </div>
+  );
+}
+
+/** A decorative area chart in the brand colour for the showcase preview. */
+function Sparkline() {
+  const line =
+    "M0,70 C22,66 34,56 52,58 C72,60 84,46 104,42 C126,38 138,50 160,38 " +
+    "C184,25 198,32 220,30 C246,28 258,16 280,20 C300,23 312,14 320,15";
+  return (
+    <svg
+      className="auth-spark"
+      viewBox="0 0 320 84"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="authSparkFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.34" />
+          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} L320,84 L0,84 Z`} fill="url(#authSparkFill)" />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Branded product showcase shown beside the form on wide screens. It speaks the
+ * dashboard's visual language — wordmark, the accent rule, a live mini-panel
+ * with a sparkline and KPI chips — so signing in feels like the same product.
+ * Collapses out on narrow screens, where the form card carries the brand.
+ */
+function AuthAside() {
+  return (
+    <aside className="auth-aside">
+      <BrandLockup className="auth-brand-aside" />
+      <div className="auth-aside-body">
+        <p className="auth-aside-title">
+          Observability for your
+          <br />
+          LLM workloads.
+        </p>
+        <p className="auth-aside-sub">
+          Track cost, latency, and errors across every model — live, in one
+          dashboard.
+        </p>
+        <div className="auth-preview" aria-hidden="true">
+          <div className="auth-preview-head">
+            <span className="auth-preview-bar" />
+            <span>Latency · p95</span>
+            <span className="auth-preview-live">
+              <span className="auth-preview-dot" />
+              live
+            </span>
+          </div>
+          <Sparkline />
+          <div className="auth-stats">
+            <StatChip label="Requests" value="1.2M" accent="var(--primary)" />
+            <StatChip label="p95" value="2.1s" accent="var(--violet)" />
+            <StatChip label="Spend" value="$1.5k" accent="var(--green)" />
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/**
+ * Two-pane auth layout: the branded showcase beside the form card. The card
+ * holds the brand mark, title/subtitle, the form, and an optional footer. On
+ * narrow screens the showcase drops away and the card stands on its own.
+ */
 export function AuthShell({
   title,
   subtitle,
@@ -114,20 +223,18 @@ export function AuthShell({
 }) {
   return (
     <div className="auth-wrap">
-      <main className="auth-card">
-        <div className="auth-brand">
-          <span className="auth-mark">
-            <MagnifierIcon />
-          </span>
-          <span className="auth-wordmark">Loupe</span>
-        </div>
-        <header className="auth-head">
-          <h1 className="auth-title">{title}</h1>
-          {subtitle ? <p className="auth-sub">{subtitle}</p> : null}
-        </header>
-        {children}
-        {footer ? <div className="auth-foot">{footer}</div> : null}
-      </main>
+      <div className="auth-grid">
+        <AuthAside />
+        <main className="auth-card">
+          <BrandLockup className="auth-brand-card" />
+          <header className="auth-head">
+            <h1 className="auth-title">{title}</h1>
+            {subtitle ? <p className="auth-sub">{subtitle}</p> : null}
+          </header>
+          {children}
+          {footer ? <div className="auth-foot">{footer}</div> : null}
+        </main>
+      </div>
     </div>
   );
 }
