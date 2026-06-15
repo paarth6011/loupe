@@ -58,6 +58,3 @@ CI fails on lint or formatting issues (`ruff check`, `ruff format --check`,
 1. Branch from `main`.
 2. Keep changes focused; update docs/tests alongside code.
 3. Ensure tests pass locally and describe what you changed and why.
-
-See [ROADMAP.md](ROADMAP.md) for where the project is headed and good first areas
-to help with.
