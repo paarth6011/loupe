@@ -175,14 +175,9 @@ function AuthAside() {
     <aside className="auth-aside">
       <BrandLockup className="auth-brand-aside" />
       <div className="auth-aside-body">
-        <p className="auth-aside-title">
-          Observability for your
-          <br />
-          LLM workloads.
-        </p>
+        <p className="auth-aside-title">Observability for LLM workloads.</p>
         <p className="auth-aside-sub">
-          Track cost, latency, and errors across every model — live, in one
-          dashboard.
+          Cost, latency, and errors across every model — live.
         </p>
         <div className="auth-preview" aria-hidden="true">
           <div className="auth-preview-head">
