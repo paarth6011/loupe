@@ -70,7 +70,9 @@ and on any auto-created workload.
 ### Layer 1 — Postgres Row-Level Security (the real guard)
 
 Enable RLS on the **four data tables** (`workloads`, `metric_samples`, `alerts`,
-`monitors`). The identity/auth-bootstrap tables — `accounts`, `users`,
+`monitors`) — later joined by a fifth, `baseline_profiles` (the seasonal anomaly
+baselines, migration `0012`), under the same `tenant_isolation` policy. The
+identity/auth-bootstrap tables — `accounts`, `users`,
 `api_keys` — are deliberately **not** under RLS: the API-key hash lookup and the
 login-by-email lookup both run *before* a tenant is known (they are what
 *establish* the tenant), so a "deny when no account set" policy would block the
