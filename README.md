@@ -190,6 +190,7 @@ automatically on first boot.
 - `POST /alerts/{id}/resolve` · `POST /alerts/{id}/reopen` (auth) — manually resolve an alert (e.g. one whose workload went quiet) or undo that
 - `GET  /workloads/{id}/monitors` (auth) — every rule's effective config for a workload
 - `PUT  /workloads/{id}/monitors/{rule}` (auth) — enable/disable or override a rule's threshold
+- `GET  /workloads/{id}/baselines` (auth) — the workload's learned seasonal baselines (typical value per metric and hour) for the "typical latency by hour" view
 - `GET  /notifications` · `PUT /notifications` (auth) — get/set the account's Slack/Discord alert webhook (URL validated to an https Slack/Discord host)
 - `POST /notifications/test` (auth) — send a sample alert to confirm the webhook works
 - `POST /admin/prune?days=N` (operator) — trigger a data-retention sweep on demand

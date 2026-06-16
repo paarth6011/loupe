@@ -8,6 +8,18 @@ All notable changes to Loupe are documented here. The format follows
 
 ### Added
 
+- **Seasonal anomaly baselines** — the anomaly detector now learns a robust
+  (median + MAD) baseline per workload, metric, and **hour of day**, so a
+  workload that's predictably slow at (say) 9am is judged against its own typical
+  9am rather than the quieter calls just before it — no more morning
+  false-positives, and no slow-to-react wide window. A background job refreshes
+  the baselines (`baseline_profiles` table, migration `0012`; `POST
+  /admin/refresh-baselines` recomputes on demand); an hour without enough history
+  falls back to the existing rolling z-score, so it degrades gracefully. The
+  dashboard's **"Typical latency by hour"** panel (`GET /workloads/{id}/baselines`)
+  plots the learned curve with a coverage badge. Tunable via
+  `ANOMALY_SEASONAL_ENABLED`, `ANOMALY_BASELINE_WEEKS`,
+  `ANOMALY_BUCKET_MIN_SAMPLES`, `ANOMALY_BASELINE_REFRESH_HOURS`.
 - **Multi-tenancy (hosted)** — accounts + users with every domain row scoped by
   `account_id`, isolated at the database level with Postgres **row-level
   security** (`0010` migration; a restricted `loupe_app` role so RLS binds).
