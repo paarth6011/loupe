@@ -5,7 +5,6 @@ import { ApiError } from "../api/client";
 import { openEventStream } from "../api/events";
 import { getCost, getSummary, getTimeseries } from "../api/metrics";
 import { setWorkloadPublic } from "../api/status";
-import { listWorkloads } from "../api/workloads";
 import AlertsPanel from "../components/AlertsPanel";
 import ApiKeysPanel from "../components/ApiKeysPanel";
 import Brand from "../components/Brand";
@@ -16,9 +15,17 @@ import LatencyChart, { type LatencyPoint } from "../components/LatencyChart";
 import MonitorsPanel from "../components/MonitorsPanel";
 import NotificationsPanel from "../components/NotificationsPanel";
 import OnboardingPanel from "../components/OnboardingPanel";
+import SeasonalBaselinePanel from "../components/SeasonalBaselinePanel";
 import SummaryCards from "../components/SummaryCards";
 import TokenChart, { type TokenPoint } from "../components/TokenChart";
-import type { Alert, CostSummary, MetricsSummary, Workload } from "../types";
+import { getWorkloadBaselines, listWorkloads } from "../api/workloads";
+import type {
+  Alert,
+  BaselineProfile,
+  CostSummary,
+  MetricsSummary,
+  Workload,
+} from "../types";
 
 const WINDOWS = ["5m", "15m", "1h", "6h", "24h", "7d"];
 // Bucket granularity per window — keeps each chart around 12–48 points.
@@ -79,6 +86,7 @@ export default function DashboardPage({
   const [errors, setErrors] = useState<ErrorPoint[]>([]);
   const [tokens, setTokens] = useState<TokenPoint[]>([]);
   const [costSeries, setCostSeries] = useState<CostPoint[]>([]);
+  const [baselines, setBaselines] = useState<BaselineProfile[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showMonitors, setShowMonitors] = useState(false);
@@ -183,6 +191,7 @@ export default function DashboardPage({
     setErrors([]);
     setTokens([]);
     setCostSeries([]);
+    setBaselines([]);
   }, [selectedId, timeWindow]);
 
   // Poll summary + alerts, accumulating a client-side time-series.
@@ -193,18 +202,20 @@ export default function DashboardPage({
     async function tick(workloadId: number) {
       const bucket = BUCKET_FOR[timeWindow] ?? "5m";
       try {
-        const [s, ts, c, a, wls] = await Promise.all([
+        const [s, ts, c, a, wls, bl] = await Promise.all([
           getSummary(workloadId, timeWindow),
           getTimeseries(workloadId, timeWindow, bucket),
           getCost(timeWindow),
           listAlerts(),
           listWorkloads(),
+          getWorkloadBaselines(workloadId),
         ]);
         if (!active) return;
         setSummary(s);
         setCost(c);
         setAlerts(a);
         setWorkloads(wls);
+        setBaselines(bl);
         setError(null);
         // Charts come straight from the bucketed history endpoint, so they're
         // fully populated on load and survive a refresh.
@@ -362,6 +373,7 @@ export default function DashboardPage({
             <>
               <SummaryCards summary={summary} />
               <LatencyChart data={latency} />
+              <SeasonalBaselinePanel baselines={baselines} />
               <ErrorRateChart data={errors} />
               {isLlm ? (
                 <>
