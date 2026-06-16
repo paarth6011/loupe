@@ -181,7 +181,7 @@ class Alert(Base):
     # Which detector raised this alert, for explainability.
     detector: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="threshold"
-    )  # "threshold" | "zscore"
+    )  # "threshold" | "zscore" | "seasonal"
     # Plain-English incident summary, populated asynchronously by the LLM.
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     triggered_at: Mapped[datetime] = mapped_column(
@@ -255,3 +255,47 @@ class Monitor(Base):
     )
 
     workload: Mapped["Workload"] = relationship(back_populates="monitors")
+
+
+class BaselineProfile(Base):
+    """A seasonal (time-of-day) baseline for one workload + metric + hour bucket.
+
+    The rolling-window z-score (see detection.py) compares recent calls to the
+    immediately-preceding ones, so a workload with a daily rhythm — e.g. always
+    slow at 9am — either false-positives every morning (narrow window) or needs a
+    window so wide it reacts slowly and hides real spikes (wide window). This
+    table breaks that trade-off: a background job (see baselines.py) precomputes a
+    robust baseline (median + MAD) per *hour of day* from recent history, so the
+    detector compares 9am traffic to *this workload's typical 9am*, not to the
+    quieter calls just before it.
+
+    One row per (workload, metric, bucket); ``bucket`` is the UTC hour-of-day
+    (0–23). Recomputed in full each refresh, so rows are disposable derived state.
+    """
+
+    __tablename__ = "baseline_profiles"
+    __table_args__ = (
+        UniqueConstraint(
+            "workload_id", "metric", "bucket", name="uq_baseline_wl_metric_bucket"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    workload_id: Mapped[int] = mapped_column(
+        ForeignKey("workloads.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    metric: Mapped[str] = mapped_column(String(16), nullable=False)  # "latency"|"cost"
+    bucket: Mapped[int] = mapped_column(Integer, nullable=False)  # UTC hour-of-day 0–23
+    # Robust baseline: median as the center, MAD×1.4826 as a std-equivalent scale.
+    center: Mapped[float] = mapped_column(Float, nullable=False)
+    scale: Mapped[float] = mapped_column(Float, nullable=False)
+    n: Mapped[int] = mapped_column(Integer, nullable=False)  # samples behind it
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

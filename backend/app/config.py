@@ -103,6 +103,19 @@ class Settings(BaseSettings):
     anomaly_min_baseline: int = 20  # need at least this many baseline calls to judge
     anomaly_z_threshold: float = 3.0  # std-devs above baseline before firing
 
+    # Seasonal baselines. The rolling window above compares recent calls to the
+    # ones just before them, so a workload with a daily rhythm (e.g. always slow
+    # at 9am) false-positives every morning. When enabled, a background job learns
+    # a robust baseline (median + MAD) per workload+metric+hour-of-day from the
+    # last `anomaly_baseline_weeks`, and the detector compares the current hour to
+    # *its own* history. A bucket with fewer than `anomaly_bucket_min_samples`
+    # falls back to the rolling-window z-score, so it degrades gracefully and
+    # needs no warm-up handling. 0 weeks (or the flag off) disables the path.
+    anomaly_seasonal_enabled: bool = True
+    anomaly_baseline_weeks: int = 3  # trailing history the baselines learn from
+    anomaly_bucket_min_samples: int = 20  # min samples in an hour before it's trusted
+    anomaly_baseline_refresh_hours: int = 6  # how often the baselines are recomputed
+
     # Redis cache (Phase 2)
     redis_url: str = "redis://redis:6379/0"
     summary_cache_ttl_seconds: int = 15

@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.baselines import start_baseline_worker
 from app.config import get_settings
 from app.database import SessionLocal
 from app.retention import start_retention_worker
@@ -85,3 +86,8 @@ if _settings.retention_silently_noops():
 start_retention_worker(
     SessionLocal, _settings.retention_days, _settings.retention_sweep_hours
 )
+
+# Background seasonal-baseline refresh for the anomaly detectors (no-op unless
+# ANOMALY_SEASONAL_ENABLED). Pins each tenant in turn, so unlike retention it
+# works under row-level security on the restricted role too.
+start_baseline_worker(SessionLocal, _settings)
