@@ -1,12 +1,87 @@
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.baselines import bucket_for, bucket_label
 from app.config import Settings
-from app.detection import zscore_anomaly
-from app.models import Alert, MetricSample, Monitor
+from app.detection import seasonal_anomaly, zscore_anomaly
+from app.models import Alert, BaselineProfile, MetricSample, Monitor
+
+
+@dataclass
+class _AnomalyEval:
+    """A detector-agnostic anomaly verdict, so the latency/cost paths can format
+    one message regardless of which detector produced it."""
+
+    detector: str  # "seasonal" | "zscore"
+    firing: bool
+    z: float
+    recent: float  # recent center (seasonal: median; zscore: mean)
+    baseline_center: float
+    baseline_spread: float
+    baseline_n: int
+    bucket: int | None  # the hour bucket (seasonal only; None for zscore)
+
+
+def _evaluate_anomaly(
+    full_values: list[float],
+    profile: BaselineProfile | None,
+    z_threshold: float,
+    settings: Settings,
+) -> _AnomalyEval | None:
+    """Judge a metric's recent window, seasonal baseline first then rolling z.
+
+    Prefers the current hour's seasonal baseline when it's populated enough to
+    trust (``anomaly_bucket_min_samples``); otherwise falls back to the
+    rolling-window z-score over ``full_values``. Returns ``None`` when neither
+    can judge (no recent data / no spread / not enough history) so the rule
+    simply doesn't fire.
+    """
+    recent_values = full_values[: settings.anomaly_recent_samples]
+    if (
+        settings.anomaly_seasonal_enabled
+        and profile is not None
+        and profile.n >= settings.anomaly_bucket_min_samples
+    ):
+        seasonal = seasonal_anomaly(
+            recent_values,
+            baseline_center=profile.center,
+            baseline_scale=profile.scale,
+            baseline_n=profile.n,
+            z_threshold=z_threshold,
+        )
+        if seasonal is not None:
+            return _AnomalyEval(
+                "seasonal",
+                seasonal.firing,
+                seasonal.z,
+                seasonal.recent_center,
+                seasonal.baseline_center,
+                seasonal.baseline_scale,
+                seasonal.baseline_n,
+                profile.bucket,
+            )
+    rolling = zscore_anomaly(
+        full_values,
+        recent_samples=settings.anomaly_recent_samples,
+        min_baseline=settings.anomaly_min_baseline,
+        z_threshold=z_threshold,
+    )
+    if rolling is None:
+        return None
+    return _AnomalyEval(
+        "zscore",
+        rolling.firing,
+        rolling.z,
+        rolling.recent_mean,
+        rolling.baseline_mean,
+        rolling.baseline_std,
+        rolling.baseline_n,
+        None,
+    )
 
 
 def _open_alerts_by_rule(db: Session, workload_id: int) -> dict[str, Alert]:
@@ -252,32 +327,60 @@ def evaluate_thresholds(
         resolved,
     )
 
-    # --- Statistical anomaly detection (zscore) -----------------------------
+    # --- Statistical anomaly detection --------------------------------------
     # Learn each workload's own baseline and flag when recent calls deviate from
     # it — catches "slow/expensive for THIS workload", which fixed thresholds
-    # miss. Reuses the `history` span fetched above (sized for these detectors).
+    # miss. Prefers a seasonal (per hour-of-day) baseline so a predictably-slow
+    # hour isn't a false alarm, and falls back to the rolling-window z-score over
+    # the `anomaly_history` span fetched above when a bucket isn't populated yet.
 
     def _severity_for(z: float, z_threshold: float) -> str:
         return "critical" if z >= 1.5 * z_threshold else "warning"
 
+    # The current hour's seasonal baselines for this workload (latency + cost),
+    # if any have been learned. One small keyed lookup; absent rows -> fallback.
+    seasonal_profiles: dict[str, BaselineProfile] = {}
+    if settings.anomaly_seasonal_enabled:
+        current_bucket = bucket_for(sample.ts)
+        seasonal_profiles = {
+            p.metric: p
+            for p in db.scalars(
+                select(BaselineProfile).where(
+                    BaselineProfile.workload_id == sample.workload_id,
+                    BaselineProfile.bucket == current_bucket,
+                )
+            ).all()
+        }
+
     # Rule: latency_anomaly — recent latency abnormally high vs the baseline.
     lat_anom_enabled, lat_z = cfg("latency_anomaly", settings.anomaly_z_threshold)
-    lat = zscore_anomaly(
+    lat = _evaluate_anomaly(
         [float(s.latency_ms) for s in anomaly_history],
-        recent_samples=settings.anomaly_recent_samples,
-        min_baseline=settings.anomaly_min_baseline,
-        z_threshold=lat_z,
+        seasonal_profiles.get("latency"),
+        lat_z,
+        settings,
     )
     lat_message = ""
     lat_severity = "warning"
+    lat_detector = "zscore"
     if lat is not None:
         lat_severity = _severity_for(lat.z, lat_z)
-        lat_message = (
-            f"latency averaged {lat.recent_mean:.0f}ms over the last "
-            f"{settings.anomaly_recent_samples} calls — {lat.z:.1f}σ above this "
-            f"workload's baseline {lat.baseline_mean:.0f}ms "
-            f"± {lat.baseline_std:.0f}ms ({lat.baseline_n} samples)"
-        )
+        lat_detector = lat.detector
+        if lat.detector == "seasonal":
+            lat_message = (
+                f"latency median {lat.recent:.0f}ms over the last "
+                f"{settings.anomaly_recent_samples} calls — {lat.z:.1f}σ above this "
+                f"workload's typical {bucket_label(lat.bucket)} baseline "
+                f"{lat.baseline_center:.0f}ms ± {lat.baseline_spread:.0f}ms "
+                f"({lat.baseline_n} samples)"
+            )
+        else:
+            lat_message = (
+                f"latency averaged {lat.recent:.0f}ms over the last "
+                f"{settings.anomaly_recent_samples} calls — {lat.z:.1f}σ above this "
+                f"workload's baseline {lat.baseline_center:.0f}ms "
+                f"± {lat.baseline_spread:.0f}ms ({lat.baseline_n} samples)"
+            )
     _reconcile(
         db,
         open_by_rule,
@@ -289,28 +392,39 @@ def evaluate_thresholds(
         lat_severity,
         opened,
         resolved,
-        detector="zscore",
+        detector=lat_detector,
     )
 
     # Rule: cost_anomaly — recent per-call cost abnormally high vs the baseline.
     # Dormant for HTTP workloads (no cost samples -> detector abstains).
     cost_anom_enabled, cost_z = cfg("cost_anomaly", settings.anomaly_z_threshold)
-    cost = zscore_anomaly(
+    cost = _evaluate_anomaly(
         [float(s.cost_usd) for s in anomaly_history if s.cost_usd is not None],
-        recent_samples=settings.anomaly_recent_samples,
-        min_baseline=settings.anomaly_min_baseline,
-        z_threshold=cost_z,
+        seasonal_profiles.get("cost"),
+        cost_z,
+        settings,
     )
     cost_message = ""
     cost_severity = "warning"
+    cost_detector = "zscore"
     if cost is not None:
         cost_severity = _severity_for(cost.z, cost_z)
-        cost_message = (
-            f"cost averaged ${cost.recent_mean:.4f}/call over the last "
-            f"{settings.anomaly_recent_samples} calls — {cost.z:.1f}σ above this "
-            f"workload's baseline ${cost.baseline_mean:.4f} "
-            f"± ${cost.baseline_std:.4f} ({cost.baseline_n} samples)"
-        )
+        cost_detector = cost.detector
+        if cost.detector == "seasonal":
+            cost_message = (
+                f"cost median ${cost.recent:.4f}/call over the last "
+                f"{settings.anomaly_recent_samples} calls — {cost.z:.1f}σ above this "
+                f"workload's typical {bucket_label(cost.bucket)} baseline "
+                f"${cost.baseline_center:.4f} ± ${cost.baseline_spread:.4f} "
+                f"({cost.baseline_n} samples)"
+            )
+        else:
+            cost_message = (
+                f"cost averaged ${cost.recent:.4f}/call over the last "
+                f"{settings.anomaly_recent_samples} calls — {cost.z:.1f}σ above this "
+                f"workload's baseline ${cost.baseline_center:.4f} "
+                f"± ${cost.baseline_spread:.4f} ({cost.baseline_n} samples)"
+            )
     _reconcile(
         db,
         open_by_rule,
@@ -322,7 +436,7 @@ def evaluate_thresholds(
         cost_severity,
         opened,
         resolved,
-        detector="zscore",
+        detector=cost_detector,
     )
 
     return opened, resolved

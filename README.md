@@ -193,6 +193,7 @@ automatically on first boot.
 - `GET  /notifications` · `PUT /notifications` (auth) — get/set the account's Slack/Discord alert webhook (URL validated to an https Slack/Discord host)
 - `POST /notifications/test` (auth) — send a sample alert to confirm the webhook works
 - `POST /admin/prune?days=N` (operator) — trigger a data-retention sweep on demand
+- `POST /admin/refresh-baselines` (operator) — recompute the seasonal anomaly baselines for every tenant on demand
 - `POST /auth/stream-ticket` (auth) — exchange the admin token for a short-lived, read-only ticket for the live stream
 - `GET  /events?ticket=<ticket>` — Server-Sent Events stream; pushes a `changed` event when new data lands so the dashboard refetches without fixed-interval polling
 
@@ -226,16 +227,33 @@ those fields are null.
 per-workload **z-score** baseline catches latency/cost that is abnormal *for that
 workload* even when it's under the absolute ceiling (e.g. a service usually at
 50 ms jumping to 300 ms). It's explainable by design — every anomaly alert is
-tagged with its `detector` (`zscore`) and spells out the numbers: recent mean,
-the learned baseline mean ± σ, and the sample count.
+tagged with its `detector` and spells out the numbers: the recent value, the
+learned baseline center ± spread, and the sample count.
 
 | Rule | Fires when | Detector |
 |---|---|---|
-| `latency_anomaly` | recent latency is ≥ N σ above the workload's baseline | `zscore` |
-| `cost_anomaly` | recent per-call cost is ≥ N σ above the workload's baseline | `zscore` |
+| `latency_anomaly` | recent latency is ≥ N σ above the workload's baseline | `seasonal` / `zscore` |
+| `cost_anomaly` | recent per-call cost is ≥ N σ above the workload's baseline | `seasonal` / `zscore` |
+
+**Seasonal baselines** handle workloads with a daily rhythm. A plain rolling
+window compares recent calls to the ones just before them, so a service that's
+predictably slow at 9 am either false-positives every morning or needs a window
+so wide it reacts slowly and hides real spikes. With `ANOMALY_SEASONAL_ENABLED`
+(default on), a background job learns a **robust** baseline (median + MAD) per
+workload, metric, and **hour of day** from the last `ANOMALY_BASELINE_WEEKS` of
+history, and the detector compares the current hour to *its own* typical value
+(alert `detector` = `seasonal`, message reads "…above this workload's typical
+09:00 baseline…"). An hour that hasn't gathered `ANOMALY_BUCKET_MIN_SAMPLES` yet
+falls back to the rolling z-score (`detector` = `zscore`), so it degrades
+gracefully and needs no warm-up. Baselines refresh every
+`ANOMALY_BASELINE_REFRESH_HOURS`; `POST /admin/refresh-baselines` (operator)
+recomputes them on demand.
 
 Tunable via `ANOMALY_Z_THRESHOLD` (default `3.0`), `ANOMALY_RECENT_SAMPLES`,
-`ANOMALY_MIN_BASELINE`, and `ANOMALY_BASELINE_WINDOW`.
+`ANOMALY_MIN_BASELINE`, `ANOMALY_BASELINE_WINDOW`, and the seasonal knobs
+`ANOMALY_SEASONAL_ENABLED`, `ANOMALY_BASELINE_WEEKS` (default `3`),
+`ANOMALY_BUCKET_MIN_SAMPLES` (default `20`), and `ANOMALY_BASELINE_REFRESH_HOURS`
+(default `6`).
 
 **Per-workload overrides:** the env vars above set the *global defaults*. Each
 workload can override any rule's threshold or disable it entirely — at runtime, no
