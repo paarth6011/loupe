@@ -5,6 +5,14 @@ export interface Workload {
   public: boolean;
 }
 
+export interface BaselineProfile {
+  metric: string; // "latency" | "cost"
+  bucket: number; // UTC hour-of-day, 0–23
+  center: number; // learned median
+  scale: number; // robust spread (MAD×1.4826)
+  n: number; // samples behind this bucket
+}
+
 export interface StatusComponent {
   name: string;
   status: "operational" | "degraded" | "down" | "unknown";

@@ -897,6 +897,42 @@ select:hover {
 }
 
 /* ---------- Spend breakdown ---------- */
+/* ---------- Seasonal baseline panel ---------- */
+.baseline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.baseline-head h3 {
+  margin: 0;
+}
+.baseline-badge {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.baseline-badge.is-active {
+  background: rgba(52, 211, 153, 0.16);
+  color: var(--green);
+}
+.baseline-badge.is-learning {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.baseline-empty {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 4px 0 2px;
+}
+
 .breakdown-head {
   display: flex;
   align-items: baseline;
