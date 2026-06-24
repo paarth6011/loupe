@@ -15,6 +15,7 @@ import LatencyChart, { type LatencyPoint } from "../components/LatencyChart";
 import MonitorsPanel from "../components/MonitorsPanel";
 import NotificationsPanel from "../components/NotificationsPanel";
 import OnboardingPanel from "../components/OnboardingPanel";
+import SummarizerKeyPanel from "../components/SummarizerKeyPanel";
 import SeasonalBaselinePanel from "../components/SeasonalBaselinePanel";
 import SummaryCards from "../components/SummaryCards";
 import TokenChart, { type TokenPoint } from "../components/TokenChart";
@@ -92,6 +93,7 @@ export default function DashboardPage({
   const [showMonitors, setShowMonitors] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showSummarizer, setShowSummarizer] = useState(false);
   // Manual alert resolve: which alert is mid-request (to disable its button),
   // and the most recently resolved alert offering a brief Undo.
   const [resolvingId, setResolvingId] = useState<number | null>(null);
@@ -337,6 +339,10 @@ export default function DashboardPage({
           <Icon path="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
           Notifications
         </button>
+        <button className="secondary" onClick={() => setShowSummarizer(true)}>
+          <Icon path="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z" />
+          Summaries
+        </button>
         {showLogout ? <button onClick={onLogout}>Log out</button> : null}
       </header>
 
@@ -359,6 +365,13 @@ export default function DashboardPage({
       {showNotifications ? (
         <NotificationsPanel
           onClose={() => setShowNotifications(false)}
+          onError={handleError}
+        />
+      ) : null}
+
+      {showSummarizer ? (
+        <SummarizerKeyPanel
+          onClose={() => setShowSummarizer(false)}
           onError={handleError}
         />
       ) : null}

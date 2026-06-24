@@ -3,10 +3,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
-from app.models import Alert
+from app.config import Settings, get_settings
+from app.models import Account, Alert
 
 # Some context fields are attacker-influenced: a workload name is chosen by
 # whoever holds an ingest key, and it feeds the alert message too. We wrap those
@@ -140,20 +141,74 @@ class OllamaSummarizer:
         return response.json()["message"]["content"].strip()
 
 
-def get_summarizer() -> Summarizer:
-    """Pick a summarizer from SUMMARY_PROVIDER, defaulting to the safe path.
+class GeminiSummarizer:
+    """Generates summaries via Google's Gemini API (gemini-2.5-flash).
 
-    "auto" keeps the original behavior (Claude if a key exists, else template);
-    "template"/"ollama"/"claude" force a specific backend. "claude" without a key
-    degrades to the template rather than failing — summaries are best-effort.
+    BYOK: the key is the tenant's *own* free Gemini key, used only for incident
+    summaries — so the operator never pays for tenants' summaries. Same
+    resilience contract as the Claude/Ollama backends: a bounded timeout, and any
+    failure propagates so the background task leaves Alert.summary NULL and
+    ingestion is never affected.
     """
-    settings = get_settings()
+
+    _ENDPOINT = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "{model}:generateContent"
+    )
+
+    def __init__(self, api_key: str, model: str, timeout: float = 10.0) -> None:
+        self._api_key = api_key
+        self._model = model
+        self._timeout = timeout
+
+    def summarize(self, ctx: AlertContext) -> str:
+        import httpx  # lazy import; only the Gemini path needs it here
+
+        response = httpx.post(
+            self._ENDPOINT.format(model=self._model),
+            # The key travels as a header, not a query param, so it can't land
+            # in proxy/access logs the way a ?key= would.
+            headers={"x-goog-api-key": self._api_key},
+            json={
+                "systemInstruction": {"parts": [{"text": _SYSTEM_PROMPT}]},
+                "contents": [
+                    {"role": "user", "parts": [{"text": _render_context(ctx)}]}
+                ],
+                "generationConfig": {"maxOutputTokens": 150},
+            },
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        candidate = response.json()["candidates"][0]
+        return "".join(
+            part.get("text", "") for part in candidate["content"]["parts"]
+        ).strip()
+
+
+def get_summarizer(settings: Settings | None = None) -> Summarizer:
+    """Pick a global summarizer from SUMMARY_PROVIDER, defaulting to the safe path.
+
+    "auto" uses a global key if present (Gemini preferred, else Claude), else the
+    $0 template; "template"/"ollama"/"gemini"/"claude" force a specific backend.
+    A forced provider without its key degrades to the template rather than
+    failing — summaries are best-effort. ``settings`` defaults to the global
+    config; the per-account resolver passes its own so the fallback honors it.
+    """
+    settings = settings or get_settings()
     provider = settings.summary_provider.strip().lower()
 
     if provider == "template":
         return TemplateSummarizer()
     if provider == "ollama":
         return OllamaSummarizer(settings.ollama_url, settings.ollama_model)
+    if provider == "gemini":
+        if not settings.gemini_api_key:
+            logging.getLogger("uvicorn.error").warning(
+                "SUMMARY_PROVIDER=gemini but no GEMINI_API_KEY; "
+                "using the template summarizer."
+            )
+            return TemplateSummarizer()
+        return GeminiSummarizer(settings.gemini_api_key, settings.gemini_model)
     if provider == "claude":
         if not settings.anthropic_api_key:
             logging.getLogger("uvicorn.error").warning(
@@ -163,10 +218,32 @@ def get_summarizer() -> Summarizer:
             return TemplateSummarizer()
         return ClaudeSummarizer(settings.anthropic_api_key, settings.summary_model)
 
-    # "auto" (default): Claude when a key is present, else the no-key template.
+    # "auto" (default): a global key when present (Gemini preferred, else
+    # Claude), otherwise the no-key template.
+    if settings.gemini_api_key:
+        return GeminiSummarizer(settings.gemini_api_key, settings.gemini_model)
     if settings.anthropic_api_key:
         return ClaudeSummarizer(settings.anthropic_api_key, settings.summary_model)
     return TemplateSummarizer()
+
+
+def summarizer_for_account(
+    db: Session, account_id: int, settings: Settings
+) -> Summarizer:
+    """Resolve the summarizer for one tenant. Precedence: the account's own
+    Gemini key (BYOK) -> Gemini; else the global self-host summarizer
+    (SUMMARY_PROVIDER / GEMINI_API_KEY / ANTHROPIC_API_KEY); else the $0 template.
+
+    On the hosted product the operator leaves the global keys empty, so a tenant
+    with no key of its own gets the deterministic template — never the operator's
+    key, and the operator never pays for tenants' summaries. The key is read here
+    on the request's pinned session and captured into the summarizer, so
+    background summarization needs no DB/account context.
+    """
+    key = db.scalar(select(Account.gemini_api_key).where(Account.id == account_id))
+    if key:
+        return GeminiSummarizer(key, settings.gemini_model)
+    return get_summarizer(settings)
 
 
 def generate_and_store_summary(

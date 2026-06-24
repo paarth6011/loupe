@@ -8,6 +8,16 @@ All notable changes to Loupe are documented here. The format follows
 
 ### Added
 
+- **Bring-your-own Gemini key for incident summaries** — each tenant adds its
+  own **free** [Gemini](https://aistudio.google.com/apikey) key from the
+  dashboard (**Summaries** panel), used *only* to write the one-line incident
+  summaries. It's stored per-account and **never returned to the browser** (reads
+  expose only whether a key is set plus a masked last-4 hint), so the hosted
+  operator no longer pays for tenants' summaries with a single shared key. With
+  no key, alerts still fire with the deterministic $0 template. New `gemini`
+  value for `SUMMARY_PROVIDER` (self-host global key via `GEMINI_API_KEY`), new
+  `GET`/`PUT /summarizer/key` endpoints, and the `accounts.gemini_api_key`
+  column (migration `0013`).
 - **Seasonal anomaly baselines** — the anomaly detector now learns a robust
   (median + MAD) baseline per workload, metric, and **hour of day**, so a
   workload that's predictably slow at (say) 9am is judged against its own typical

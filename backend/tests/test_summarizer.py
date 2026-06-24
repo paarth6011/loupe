@@ -15,6 +15,8 @@ def _settings(**overrides) -> SimpleNamespace:
         summary_provider="auto",
         anthropic_api_key="",
         summary_model="claude-haiku-4-5",
+        gemini_api_key="",
+        gemini_model="gemini-2.5-flash",
         ollama_url="http://localhost:11434",
         ollama_model="llama3.2",
     )
@@ -134,6 +136,69 @@ def test_ollama_summarizer_calls_local_api(monkeypatch):
     assert body["stream"] is False
     assert body["messages"][0]["role"] == "system"
     assert "gpt-4o-chat" in body["messages"][1]["content"]
+
+
+def test_gemini_summarizer_calls_google_api(monkeypatch):
+    import httpx
+
+    captured = {}
+
+    class FakeResp:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> dict:
+            return {
+                "candidates": [
+                    {"content": {"parts": [{"text": "  Latency spiked.  "}]}}
+                ]
+            }
+
+    def fake_post(url, headers, json, timeout):
+        captured.update(url=url, headers=headers, json=json, timeout=timeout)
+        return FakeResp()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    out = sz.GeminiSummarizer("AIza-secret", "gemini-2.5-flash").summarize(_ctx())
+
+    assert out == "Latency spiked."  # whitespace trimmed
+    assert "gemini-2.5-flash:generateContent" in captured["url"]
+    # The key travels as a header, never in the URL/query (so it can't land in logs).
+    assert captured["headers"]["x-goog-api-key"] == "AIza-secret"
+    assert "AIza-secret" not in captured["url"]
+    body = captured["json"]
+    assert "gpt-4o-chat" in body["contents"][0]["parts"][0]["text"]
+
+
+def test_get_summarizer_gemini_provider(monkeypatch):
+    monkeypatch.setattr(
+        sz,
+        "get_settings",
+        lambda: _settings(
+            summary_provider="gemini", gemini_api_key="AIza-k", gemini_model="gemini-x"
+        ),
+    )
+    summarizer = sz.get_summarizer()
+    assert isinstance(summarizer, sz.GeminiSummarizer)
+    assert summarizer._model == "gemini-x"
+
+
+def test_get_summarizer_gemini_without_key_falls_back(monkeypatch):
+    monkeypatch.setattr(
+        sz, "get_settings", lambda: _settings(summary_provider="gemini")
+    )
+    # Requested Gemini but no key -> degrade to template instead of crashing.
+    assert isinstance(sz.get_summarizer(), TemplateSummarizer)
+
+
+def test_get_summarizer_auto_prefers_global_gemini(monkeypatch):
+    monkeypatch.setattr(
+        sz,
+        "get_settings",
+        lambda: _settings(summary_provider="auto", gemini_api_key="AIza-k"),
+    )
+    assert isinstance(sz.get_summarizer(), sz.GeminiSummarizer)
 
 
 def test_get_summarizer_template_provider(monkeypatch):

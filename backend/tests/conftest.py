@@ -19,8 +19,8 @@ from app.cache import InMemoryCache, get_cache
 from app.database import Base, get_db, get_session_factory
 from app.main import app
 from app.notifications import AlertEvent
-from app.routers.metrics import get_account_notifier
-from app.summarizer import AlertContext, get_summarizer
+from app.routers.metrics import get_account_notifier, get_account_summarizer
+from app.summarizer import AlertContext
 
 
 class FakeSummarizer:
@@ -121,7 +121,7 @@ def client(
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_cache] = lambda: cache
     app.dependency_overrides[get_session_factory] = lambda: test_session_factory
-    app.dependency_overrides[get_summarizer] = lambda: fake_summarizer
+    app.dependency_overrides[get_account_summarizer] = lambda: fake_summarizer
     app.dependency_overrides[get_account_notifier] = lambda: notifier
     with TestClient(app) as test_client:
         yield test_client
