@@ -133,3 +133,10 @@ export interface NotificationTestResult {
   ok: boolean;
   detail: string;
 }
+
+// The browser only ever sees whether a Gemini key is set plus a masked hint —
+// never the key itself.
+export interface SummarizerKeySettings {
+  gemini_key_set: boolean;
+  gemini_key_hint: string | null;
+}

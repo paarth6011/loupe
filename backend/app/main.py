@@ -18,6 +18,7 @@ from app.routers import (
     monitors,
     notifications,
     status,
+    summarizer,
     workloads,
 )
 
@@ -65,6 +66,7 @@ app.include_router(alerts.router)
 app.include_router(monitors.router)
 app.include_router(apikeys.router)
 app.include_router(notifications.router)
+app.include_router(summarizer.router)
 app.include_router(admin.router)
 app.include_router(events.router)
 app.include_router(status.router)

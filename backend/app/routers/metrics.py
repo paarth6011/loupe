@@ -30,7 +30,7 @@ from app.summarizer import (
     AlertContext,
     Summarizer,
     generate_and_store_summary,
-    get_summarizer,
+    summarizer_for_account,
 )
 
 MAX_BUCKETS = 500
@@ -51,6 +51,21 @@ def get_account_notifier(
     resolved once.
     """
     return notifier_for_account(db, account_id, settings)
+
+
+def get_account_summarizer(
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    account_id: int = Depends(require_ingest_auth),
+) -> Summarizer:
+    """Per-tenant summarizer: uses this account's own Gemini key (BYOK) for
+    incident summaries, else the global self-host fallback, else the $0 template.
+
+    A dependency (not an inline call) so tests can override it with a capturing
+    summarizer. ``require_ingest_auth`` is cached within the request, so the
+    account is resolved once and shared with the notifier dependency.
+    """
+    return summarizer_for_account(db, account_id, settings)
 
 
 def _latency_percentiles(
@@ -128,7 +143,7 @@ def ingest_metric(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-    summarizer: Summarizer = Depends(get_summarizer),
+    summarizer: Summarizer = Depends(get_account_summarizer),
     notifier: Notifier = Depends(get_account_notifier),
     session_factory: sessionmaker = Depends(get_session_factory),
     account_id: int = Depends(require_ingest_auth),

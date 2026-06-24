@@ -34,6 +34,13 @@ class Account(Base):
     # via the dashboard; validated to an https Slack/Discord host (see
     # schemas/notifications.py) so a tenant-supplied URL can't be an SSRF vector.
     notify_webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Per-tenant Gemini API key, used *only* for LLM incident summaries (BYOK).
+    # Null -> fall back to the global GEMINI_API_KEY (self-host) or the $0
+    # template summarizer (hosted, where the operator leaves the env empty), so
+    # the operator never pays for tenants' summaries. The key is stored as-is and
+    # never returned to the browser — the settings API exposes only whether it is
+    # set plus a masked last-4 hint (see schemas/summarizer.py).
+    gemini_api_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -26,7 +26,7 @@ every LLM call really costs.*
   baseline that flags what's abnormal *for that workload*. Every alert spells out
   the numbers — no black-box models.
 - **🧠 Plain-English summaries** — optional one-line incident summaries ($0
-  template, or Claude / a local Ollama model).
+  template, your own free Gemini key, Claude, or a local Ollama model).
 - **📣 Slack & Discord alerts** — per-account or global webhooks when an alert
   fires or resolves.
 - **🌐 Public status page** — an opt-in, no-auth health page for the workloads you
@@ -193,6 +193,7 @@ automatically on first boot.
 - `GET  /workloads/{id}/baselines` (auth) — the workload's learned seasonal baselines (typical value per metric and hour) for the "typical latency by hour" view
 - `GET  /notifications` · `PUT /notifications` (auth) — get/set the account's Slack/Discord alert webhook (URL validated to an https Slack/Discord host)
 - `POST /notifications/test` (auth) — send a sample alert to confirm the webhook works
+- `GET  /summarizer/key` · `PUT /summarizer/key` (auth) — set/clear the account's own Gemini key for incident summaries (BYOK; reads return only whether a key is set + a masked hint, never the key)
 - `POST /admin/prune?days=N` (operator) — trigger a data-retention sweep on demand
 - `POST /admin/refresh-baselines` (operator) — recompute the seasonal anomaly baselines for every tenant on demand
 - `POST /auth/stream-ticket` (auth) — exchange the admin token for a short-lived, read-only ticket for the live stream
@@ -325,10 +326,18 @@ calls an LLM is the plain-English alert summary, and it's opt-in.
 
 | `SUMMARY_PROVIDER` | Backend | Key? | Cost |
 |---|---|---|---|
-| `auto` (default) | Claude if `ANTHROPIC_API_KEY` is set, else the template | optional | $0 or ~$0.0005/alert |
+| `auto` (default) | a global key if set (Gemini, else Claude), else the template | optional | $0+ |
 | `template` | deterministic, no-API summary | no | **$0** |
+| `gemini` | Google Gemini (`GEMINI_API_KEY`, degrades to template if no key) | yes | **$0** on the free tier |
 | `ollama` | a local Ollama server (`OLLAMA_URL` / `OLLAMA_MODEL`) | no | **$0**, offline |
 | `claude` | Anthropic API (degrades to template if no key) | yes | ~$0.0005/alert |
+
+> **Hosted (multi-tenant): bring your own free Gemini key.** On the hosted
+> product each tenant pastes its own free [Gemini](https://aistudio.google.com/apikey)
+> key in the dashboard (**Summaries** panel) — it's used *only* for incident
+> summaries, stored per-account, and never returned to the browser. The operator
+> leaves the global keys empty, so an account with no key falls back to the $0
+> template (the operator never pays for tenants' summaries).
 
 For the **$0 local-model** path: install [Ollama](https://ollama.com), run
 `ollama pull llama3.2`, then set `SUMMARY_PROVIDER=ollama` (the Docker default

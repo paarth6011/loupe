@@ -126,9 +126,18 @@ class Settings(BaseSettings):
     #   "template" -> always the deterministic, no-API template
     #   "claude"   -> Anthropic API (falls back to template if no key)
     #   "ollama"   -> a local Ollama server ($0, offline)
+    #   "gemini"   -> Google Gemini (falls back to template if no key)
+    # On the hosted product each tenant brings its own free Gemini key (BYOK,
+    # stored per-account); the env vars below are the *self-host* global
+    # fallback, used only when an account has no key of its own.
     summary_provider: str = "auto"
     anthropic_api_key: str = ""
     summary_model: str = "claude-haiku-4-5"
+    # Self-host global Gemini fallback. The hosted operator leaves GEMINI_API_KEY
+    # empty so a tenant with no key of its own gets the $0 template — never the
+    # operator's key.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
     # Local Ollama (used when summary_provider="ollama"). From inside Docker, a
     # host-run Ollama is typically http://host.docker.internal:11434.
     ollama_url: str = "http://localhost:11434"
