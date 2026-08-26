@@ -1,17 +1,17 @@
-fastapi==0.136.3
-uvicorn[standard]==0.49.0
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
 pydantic==2.13.4
-pydantic-settings==2.14.2
-SQLAlchemy==2.0.50
-alembic==1.18.4
+pydantic-settings==2.15.0
+SQLAlchemy==2.0.52
+alembic==1.19.1
 psycopg[binary]==3.3.4
 python-jose[cryptography]==3.5.0
 bcrypt==5.0.0
 python-multipart==0.0.32
-redis==8.0.0
+redis==8.1.0
 anthropic==0.109.1
 # Used at runtime for the local-Ollama summarizer (and by the test client).
 httpx==0.28.1
 
 # Tests
-pytest==9.0.3
+pytest==9.1.1
